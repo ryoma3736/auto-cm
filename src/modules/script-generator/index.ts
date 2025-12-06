@@ -73,7 +73,7 @@ export interface ScriptGeneratorOptions {
   apiKey?: string;
   /** Google Gemini API key (preferred) */
   geminiApiKey?: string;
-  /** OpenAI model to use (default: gpt-4o) */
+  /** OpenAI model to use (default: gpt-5) */
   model?: string;
   /** Gemini model to use (default: gemini-2.0-flash-exp) */
   geminiModel?: string;
@@ -85,18 +85,67 @@ export interface ScriptGeneratorOptions {
   useMock?: boolean;
   /** Use Gemini as primary provider (default: true) */
   useGeminiPrimary?: boolean;
+  /** Script language (ja, en, zh) */
+  language?: 'ja' | 'en' | 'zh';
 }
 
 /**
  * Default configuration
  */
 const DEFAULT_OPTIONS: Required<Omit<ScriptGeneratorOptions, 'apiKey' | 'geminiApiKey'>> = {
-  model: 'gpt-4o',
+  model: 'gpt-5',
   geminiModel: 'gemini-2.0-flash-exp',
   maxRetries: 3,
   targetDuration: 12,
   useMock: false,
   useGeminiPrimary: true, // Gemini is now the default
+  language: 'ja',
+};
+
+/**
+ * Language-specific instructions for script generation
+ * 言語設定に基づいて国籍・人種も自動的に決定
+ */
+const LANGUAGE_INSTRUCTIONS: Record<'ja' | 'en' | 'zh', {
+  personaLang: string;
+  scriptLang: string;
+  example: string;
+  nameExample: string;
+  narrationLabel: string;
+  nationality: string;
+  ethnicDescription: string;
+  locationExample: string;
+}> = {
+  ja: {
+    personaLang: '【必須】日本語でペルソナを生成。日本人の名前を使用（例: 美咲、遥、さくら）。全ての出力を日本語で。',
+    scriptLang: '【絶対厳守】narrationフィールドは100%日本語で書くこと。英語禁止。日本語の自然な話し言葉で、友達に話すようなカジュアルな口調で書いてください。',
+    example: '例: 「ねぇねぇ、これ見て！」「マジでこれいいよ！」「めっちゃ使いやすいの！」「絶対おすすめ！」',
+    nameExample: '美咲',
+    narrationLabel: '【日本語で書くこと】',
+    nationality: 'Japanese',
+    ethnicDescription: 'Japanese woman with black hair',
+    locationExample: 'bright modern apartment in Tokyo',
+  },
+  en: {
+    personaLang: 'Generate persona in English. Use an American/English name.',
+    scriptLang: 'Write ALL narration in natural, casual English. Like talking to a friend on social media.',
+    example: 'Example: "OMG you guys, this is SO good! I literally can\'t stop using it!"',
+    nameExample: 'Emma',
+    narrationLabel: 'Narration (casual English, like talking to a friend)',
+    nationality: 'American',
+    ethnicDescription: 'American woman with blonde or brown hair',
+    locationExample: 'bright modern apartment in Los Angeles',
+  },
+  zh: {
+    personaLang: '用中文生成角色。使用中文名字。',
+    scriptLang: '用自然的中文口语写台词。像跟朋友聊天一样轻松随意。',
+    example: '例如：姐妹们！这个真的太好用了！我已经回购三次了！',
+    nameExample: '小雨',
+    narrationLabel: '台词（自然的中文口语）',
+    nationality: 'Chinese',
+    ethnicDescription: 'Chinese woman with long black hair',
+    locationExample: 'bright modern apartment in Shanghai',
+  },
 };
 
 /**
@@ -421,7 +470,64 @@ export class ScriptGenerator {
    */
   private buildPersonaPrompt(analysis: ProductAnalysis): string {
     const analysisText = JSON.stringify(analysis, null, 2);
-    return PERSONA_GENERATION_PROMPT.replace('{PRODUCT_ANALYSIS}', analysisText);
+    const lang = this.options.language || 'ja';
+    const langInstructions = LANGUAGE_INSTRUCTIONS[lang];
+
+    // Japanese prompt is completely in Japanese
+    if (lang === 'ja') {
+      return `あなたはマーケティングの専門家です。
+以下の商品分析結果に基づき、最適なターゲットペルソナを生成してください。
+
+商品分析:
+${analysisText}
+
+【必須】日本語でペルソナを生成してください。日本人の名前を使用してください。
+名前の例: 美咲、遥、さくら、あかり、ゆい
+
+以下の形式でJSON出力してください:
+{
+  "name": "日本人の名前（例: 美咲）",
+  "age": 年齢（数値）,
+  "occupation": "職業（例: IT企業勤務）",
+  "personality": ["性格1", "性格2", "性格3"],
+  "speakingStyle": "話し方の特徴（例: 友達に話すようなカジュアルで親しみやすい口調）",
+  "painPoints": ["この商品が解決する悩み1", "悩み2"],
+  "lifestyle": "ライフスタイルの説明（例: 仕事が忙しく、スキンケアは時短重視）"
+}
+
+注意:
+- ターゲット層と商品の特徴に基づいてリアルなペルソナを作成
+- UGC広告の作成者として自然な人物像に
+- 友達にスマホで紹介するようなカジュアルさを持つ人`;
+    }
+
+    // Non-Japanese languages
+    return `You are a marketing expert specializing in creating target personas for UGC advertisements.
+
+Based on the following product analysis, generate an optimal target persona.
+
+Product Analysis:
+${analysisText}
+
+【CRITICAL LANGUAGE REQUIREMENT】
+${langInstructions.personaLang}
+Name example: ${langInstructions.nameExample}
+
+Output in the following JSON format:
+{
+  "name": "Persona name (use a name appropriate for the target language/culture)",
+  "age": age (number),
+  "occupation": "Occupation",
+  "personality": ["trait1", "trait2", "trait3"],
+  "speakingStyle": "Speaking style description",
+  "painPoints": ["pain point 1", "pain point 2"],
+  "lifestyle": "Lifestyle description"
+}
+
+Requirements:
+- Create a realistic persona based on the target audience and product features
+- The persona should feel like a natural UGC creator
+- Someone who casually introduces products to friends via smartphone`;
   }
 
   /**
@@ -434,11 +540,134 @@ export class ScriptGenerator {
   private buildScriptPrompt(persona: Persona, analysis: ProductAnalysis): string {
     const personaText = JSON.stringify(persona, null, 2);
     const analysisText = JSON.stringify(analysis, null, 2);
+    const lang = this.options.language || 'ja';
+    const langInstructions = LANGUAGE_INSTRUCTIONS[lang];
 
-    return SCRIPT_GENERATION_PROMPT.replace('{PERSONA}', personaText).replace(
-      '{PRODUCT_ANALYSIS}',
-      analysisText
-    );
+    // Create fully language-aware prompt - Japanese version is completely in Japanese
+    if (lang === 'ja') {
+      return `あなたはUGC広告のスクリプトライターです。
+
+以下のペルソナと商品情報に基づき、12秒のUGC広告スクリプトを作成してください。
+
+ペルソナ:
+${personaText}
+
+商品分析:
+${analysisText}
+
+【絶対厳守 - narrationは100%日本語で書くこと】
+${langInstructions.scriptLang}
+${langInstructions.example}
+
+narrationフィールドには絶対に英語を使わないでください。日本語のみで書いてください。
+
+【要件】
+- 合計12秒の動画スクリプト
+- 3-4シーンに分割
+- 友達にスマホで紹介するような自然でカジュアルな口調
+- 最初のシーンは商品の登場・紹介
+- 最後のシーンは使用感やおすすめで締める
+- 各シーンに感情トーン、カメラワーク、映像描写を含める
+
+以下の形式でJSON出力してください:
+{
+  "totalDuration": 12,
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "timeCode": "00:00-00:03",
+      "durationSeconds": 3,
+      "narration": "ここに日本語のセリフを書く（例: ねぇねぇ、これ見て！）",
+      "emotion": "感情トーン（例: excited, calm, confident）",
+      "cameraDirection": "カメラワーク（例: close-up, medium shot）",
+      "visualDescription": "映像の詳細な描写"
+    }
+  ],
+  "sora2Prompt": "動画生成プロンプト"
+}
+
+【重要な注意事項】
+- narrationは必ず日本語で書くこと！英語禁止！
+- 例: 「ねぇねぇ、これ見て！」「マジでこれいいよ！」「めっちゃ使いやすいの！」
+- visualDescriptionとsora2Promptも日本語で書いてOK
+- 商品の特徴を自然に織り込む
+- 本物のUGCのような親しみやすいトーンで
+
+【sora2Prompt作成ガイド - 超重要】
+必ず以下の要素を含めること:
+- 国籍: ${langInstructions.nationality} (必須！)
+- 外見: ${langInstructions.ethnicDescription}
+- 場所: ${langInstructions.locationExample}
+- スタイル: スマホで自撮りしながら商品を紹介するUGC風
+- 雰囲気: 自然光、カジュアルな服装、親しみやすい
+
+sora2Promptの例:
+「A young ${langInstructions.ethnicDescription} in her late 20s, holding a skincare product in her ${langInstructions.locationExample}, filming herself with her smartphone in a casual UGC style. Natural lighting, casual white t-shirt, friendly and approachable atmosphere.」
+
+絶対に「${langInstructions.nationality} woman」をプロンプトに含めること！`;
+    }
+
+    // Non-Japanese languages
+    return `You are a UGC advertisement scriptwriter.
+
+Create a 12-second UGC advertisement script based on the following persona and product information.
+
+Persona:
+${personaText}
+
+Product Analysis:
+${analysisText}
+
+【CRITICAL - NARRATION LANGUAGE REQUIREMENT】
+${langInstructions.scriptLang}
+${langInstructions.example}
+
+ALL "narration" fields MUST be written in the language specified above. Do NOT use any other language for narration.
+
+【Requirements】
+- Total video duration: 12 seconds
+- Divide into 3-4 scenes
+- Natural, casual tone like introducing a product to a friend via smartphone
+- First scene: Product introduction/reveal
+- Last scene: Usage impression and recommendation
+- Include emotion tone, camera direction, and visual description for each scene
+
+Output in the following JSON format:
+{
+  "totalDuration": 12,
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "timeCode": "00:00-00:03",
+      "durationSeconds": 3,
+      "narration": "${langInstructions.narrationLabel}",
+      "emotion": "emotion tone (e.g., excited, calm, confident)",
+      "cameraDirection": "camera direction (e.g., close-up, medium shot, overhead)",
+      "visualDescription": "Detailed visual description for Sora2 (always in English)"
+    }
+  ],
+  "sora2Prompt": "Integrated Sora2 video generation prompt (always in English)"
+}
+
+IMPORTANT REMINDERS:
+- The "narration" field MUST be in the target language: ${lang === 'en' ? 'English' : 'Chinese (中文)'}
+- Example narration style: ${langInstructions.example}
+- The "visualDescription" and "sora2Prompt" should always be in English for Sora2 compatibility
+- Naturally incorporate product features into the narration
+- Keep the tone authentic and relatable
+
+【CRITICAL - sora2Prompt NATIONALITY REQUIREMENT】
+The sora2Prompt MUST feature a ${langInstructions.nationality} woman:
+- Nationality: ${langInstructions.nationality} (REQUIRED!)
+- Appearance: ${langInstructions.ethnicDescription}
+- Location: ${langInstructions.locationExample}
+- Style: UGC-style smartphone selfie video introducing a product
+- Atmosphere: Natural lighting, casual clothing, friendly and approachable
+
+Example sora2Prompt:
+"A young ${langInstructions.ethnicDescription} in her late 20s, holding a skincare product in her ${langInstructions.locationExample}, filming herself with her smartphone in a casual UGC style. Natural lighting, casual white t-shirt, friendly and approachable atmosphere."
+
+YOU MUST include "${langInstructions.nationality} woman" in the sora2Prompt!`;
   }
 
   /**
@@ -502,16 +731,60 @@ export class ScriptGenerator {
         // Optionally adjust durations here
       }
 
+      // Get sora2Prompt from API response or generate fallback
+      let sora2Prompt = String(parsed.sora2Prompt || '');
+
+      // If sora2Prompt is empty, generate from scenes
+      if (!sora2Prompt || sora2Prompt.trim() === '') {
+        console.log('⚠️ [ScriptGenerator] sora2Prompt empty, generating from scenes...');
+        sora2Prompt = this.generateSora2PromptFromScenes(scenes, this.options.language);
+        console.log(`📝 [ScriptGenerator] Generated sora2Prompt: ${sora2Prompt.substring(0, 100)}...`);
+      }
+
       return {
         totalDuration: 12,
         scenes,
-        sora2Prompt: String(parsed.sora2Prompt || ''),
+        sora2Prompt,
       };
     } catch (error) {
       throw new Error(
         `Failed to parse script response: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  /**
+   * Generate sora2Prompt from scenes as fallback
+   */
+  private generateSora2PromptFromScenes(scenes: UGCScript['scenes'], language: 'ja' | 'en' | 'zh'): string {
+    const langConfig = {
+      ja: {
+        nationality: 'Japanese',
+        ethnicity: 'Japanese woman with black hair',
+        location: 'bright modern apartment in Tokyo',
+      },
+      en: {
+        nationality: 'American',
+        ethnicity: 'American woman',
+        location: 'bright modern apartment in Los Angeles',
+      },
+      zh: {
+        nationality: 'Chinese',
+        ethnicity: 'Chinese woman with long black hair',
+        location: 'bright modern apartment in Shanghai',
+      },
+    };
+
+    const config = langConfig[language];
+
+    // Combine visualDescriptions from scenes
+    const visualElements = scenes
+      .map(scene => scene.visualDescription)
+      .filter(desc => desc && desc.length > 0)
+      .join(' ');
+
+    // Generate a comprehensive Sora 2 prompt
+    return `A ${config.ethnicity} in her early 30s in a ${config.location}, creating an authentic UGC-style video. ${visualElements}. The lighting is warm and natural, shot in vertical 9:16 format for social media. Smooth camera movements, authentic and relatable content creation style.`;
   }
 
   /**

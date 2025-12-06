@@ -51,7 +51,7 @@ export interface VisionAnalyzerOptions {
   claudeApiKey?: string;
   /** Google Gemini API key (preferred) */
   geminiApiKey?: string;
-  /** OpenAI model to use (default: gpt-4o) */
+  /** OpenAI model to use (default: gpt-5) */
   openaiModel?: string;
   /** Claude model to use (default: claude-3-5-sonnet-20241022) */
   claudeModel?: string;
@@ -71,12 +71,12 @@ export interface VisionAnalyzerOptions {
  * Default configuration
  */
 const DEFAULT_OPTIONS: Required<Omit<VisionAnalyzerOptions, 'openaiApiKey' | 'claudeApiKey' | 'geminiApiKey'>> = {
-  openaiModel: 'gpt-4o',
+  openaiModel: 'gpt-5',
   claudeModel: 'claude-3-5-sonnet-20241022',
-  geminiModel: 'gemini-2.0-flash-exp',
+  geminiModel: 'gemini-3-pro-preview',
   maxRetries: 3,
   useClaudePrimary: false,
-  useGeminiPrimary: true, // Gemini is now the default primary provider
+  useGeminiPrimary: true, // Gemini 3 Pro for vision (best multimodal)
   useMock: false,
 };
 

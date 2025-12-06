@@ -281,11 +281,17 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
     }
 
     const imageBase64 = req.file.buffer.toString('base64');
+    const duration = parseInt(req.body.duration) || 12;
+    const language = req.body.language || 'ja';
+
+    console.log(`📋 [API] Duration: ${duration}s, Language: ${language}`);
 
     const pipeline = new AdGenerationPipeline({
       useMock: false, // 本番APIを使用（Gemini Vision + Nano Banana Pro）
       mockVideoOnly: !process.env.REPLICATE_API_TOKEN, // Replicate APIトークンがあればSora 2使用
       verbose: true,
+      duration,
+      language,
     });
 
     const result = await pipeline.generate({
@@ -307,7 +313,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     apis: {
-      vision: process.env.GEMINI_API_KEY ? 'Gemini Vision' : (process.env.OPENAI_API_KEY ? 'OpenAI GPT-4o' : 'Mock'),
+      vision: process.env.GEMINI_API_KEY ? 'Gemini Vision' : (process.env.OPENAI_API_KEY ? 'OpenAI GPT-5' : 'Mock'),
       imageExtension: process.env.GEMINI_API_KEY ? 'Nano Banana Pro (Gemini)' : 'Sharp (Padding)',
       videoGeneration: process.env.REPLICATE_API_TOKEN ? 'Sora 2 (via Replicate)' : 'Mock',
     },
@@ -328,7 +334,7 @@ app.listen(PORT, () => {
   console.log('📡 API: http://localhost:' + PORT + '/api/generate');
   console.log('');
   console.log('API Status:');
-  console.log('  👁️  Vision:', process.env.GEMINI_API_KEY ? '✅ Gemini Vision' : (process.env.OPENAI_API_KEY ? '✅ OpenAI GPT-4o' : '❌ Mock'));
+  console.log('  👁️  Vision:', process.env.GEMINI_API_KEY ? '✅ Gemini Vision' : (process.env.OPENAI_API_KEY ? '✅ OpenAI GPT-5' : '❌ Mock'));
   console.log('  📸 Image:', process.env.GEMINI_API_KEY ? '✅ Nano Banana Pro' : '⚠️ Sharp (Padding)');
   console.log('  🎥 Video:', process.env.REPLICATE_API_TOKEN ? '✅ Sora 2 (Replicate)' : '⚠️ Mock');
   console.log('');

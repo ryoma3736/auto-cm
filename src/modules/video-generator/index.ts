@@ -103,7 +103,7 @@ export class VideoGenerator {
   constructor(options: VideoGeneratorOptions = {}) {
     const replicateToken = options.replicateApiToken || process.env.REPLICATE_API_TOKEN;
     this.openaiApiKey = options.openaiApiKey || process.env.OPENAI_API_KEY;
-    this.maxWaitTime = options.maxWaitTime || 5 * 60 * 1000; // 5 minutes
+    this.maxWaitTime = options.maxWaitTime || 10 * 60 * 1000; // 10 minutes (Sora 2 can take long)
     this.pollInterval = options.pollInterval || 5000; // 5 seconds
     this.useMock = options.useMock ?? !replicateToken;
 
@@ -160,6 +160,13 @@ export class VideoGenerator {
     }
 
     try {
+      // Log the request for debugging
+      console.log('🎥 [VideoGenerator] Starting Sora2 generation:');
+      console.log(`   Duration: ${duration}s, Aspect: ${aspectRatio}`);
+      console.log(`   Prompt length: ${request.prompt?.length || 0} chars`);
+      console.log(`   Prompt preview: ${request.prompt?.substring(0, 100)}...`);
+      console.log(`   Has first frame: ${!!request.firstFrameImage}`);
+
       // Create prediction (async - returns immediately with ID)
       const prediction = await this.replicate.predictions.create({
         model: 'openai/sora-2',
@@ -196,6 +203,13 @@ export class VideoGenerator {
     try {
       const prediction = await this.replicate.predictions.get(generationId);
 
+      // Log detailed status for debugging
+      console.log(`🔄 [VideoGenerator] Status check: ${prediction.status}`);
+      if (prediction.status === 'failed') {
+        console.error('❌ [VideoGenerator] Replicate failed! Full response:');
+        console.error(JSON.stringify(prediction, null, 2));
+      }
+
       return {
         id: prediction.id,
         status: this.mapReplicateStatus(prediction.status),
@@ -203,6 +217,7 @@ export class VideoGenerator {
         error: prediction.error ? String(prediction.error) : undefined,
       };
     } catch (error) {
+      console.error('❌ [VideoGenerator] Error checking status:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to check status: ${error.message}`);
       }
@@ -259,30 +274,92 @@ export class VideoGenerator {
 
   /**
    * Generate video and wait for completion (convenience method)
+   * Includes retry logic for content moderation errors
    * @param request Video generation request
    * @returns Final video result
    * @throws Error if timeout or generation fails
    */
   async generateAndWait(request: VideoRequest): Promise<VideoResult> {
-    const generation = await this.generate(request);
+    const maxRetries = 2;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this._generateAndWaitOnce(request, attempt);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if it's a content moderation error (retryable)
+        const isContentModerationError = lastError.message.includes('flagged as sensitive') ||
+                                         lastError.message.includes('E005');
+
+        if (isContentModerationError && attempt < maxRetries) {
+          console.log(`⚠️ [VideoGenerator] Content moderation error, retrying (${attempt}/${maxRetries})...`);
+          // Wait a bit before retry
+          await this.sleep(2000);
+          continue;
+        }
+
+        throw lastError;
+      }
+    }
+
+    throw lastError || new Error('Video generation failed after retries');
+  }
+
+  /**
+   * Internal method for single generation attempt
+   */
+  private async _generateAndWaitOnce(request: VideoRequest, attempt: number): Promise<VideoResult> {
+    // Log detailed request info for debugging
+    console.log(`🎬 [VideoGenerator] generateAndWait called (attempt ${attempt})`);
+    console.log(`   Prompt length: ${request.prompt?.length || 0}`);
+    console.log(`   Prompt empty: ${!request.prompt || request.prompt.trim() === ''}`);
+
+    if (!request.prompt || request.prompt.trim() === '') {
+      console.error('❌ [VideoGenerator] ERROR: Empty or missing sora2Prompt!');
+      throw new Error('Video generation failed: Empty prompt provided');
+    }
+
+    let generation;
+    try {
+      generation = await this.generate(request);
+      console.log(`🎬 [VideoGenerator] Generation started: ID=${generation.id}`);
+    } catch (error) {
+      console.error('❌ [VideoGenerator] Failed to start generation:', error);
+      throw error;
+    }
+
     const startTime = Date.now();
 
     while (true) {
       const elapsed = Date.now() - startTime;
+      const elapsedSeconds = Math.floor(elapsed / 1000);
 
       if (elapsed > this.maxWaitTime) {
+        console.error(`❌ [VideoGenerator] TIMEOUT after ${elapsedSeconds}s (max: ${this.maxWaitTime / 1000}s)`);
         throw new Error(
           `Video generation timeout after ${this.maxWaitTime}ms`
         );
       }
 
-      const status = await this.checkStatus(generation.id);
+      let status;
+      try {
+        status = await this.checkStatus(generation.id);
+      } catch (checkError) {
+        console.error('❌ [VideoGenerator] Error during status check:', checkError);
+        throw new Error(`Failed to check video status: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+      }
 
       if (status.status === 'completed') {
+        console.log(`✅ [VideoGenerator] Video completed after ${elapsedSeconds}s`);
         return await this.getVideo(generation.id);
       }
 
       if (status.status === 'failed') {
+        console.error('❌ [VideoGenerator] Video generation FAILED!');
+        console.error('   Error:', status.error);
+        console.error('   Full status:', JSON.stringify(status, null, 2));
         throw new Error(
           `Video generation failed: ${status.error || 'Unknown error'}`
         );

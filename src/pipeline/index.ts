@@ -26,6 +26,7 @@ import {
 } from '../modules/script-generator/index.js';
 import { ImageProcessor } from '../modules/image-processor/index.js';
 import { VideoGenerator } from '../modules/video-generator/index.js';
+import { VoiceGenerator } from '../modules/voice-generator/index.js';
 import { DriveStorage, type VideoFile } from '../modules/storage/index.js';
 
 // ========== Pipeline Interfaces ==========
@@ -85,6 +86,10 @@ export interface PipelineOptions {
   mockVideoOnly?: boolean;
   /** Enable verbose logging */
   verbose?: boolean;
+  /** Video duration in seconds (4, 8, or 12) */
+  duration?: number;
+  /** Script language (ja, en, zh) */
+  language?: 'ja' | 'en' | 'zh';
 }
 
 // ========== Main Pipeline Class ==========
@@ -105,6 +110,7 @@ export class AdGenerationPipeline {
   private scriptGenerator: ScriptGenerator;
   private imageProcessor: ImageProcessor;
   private videoGenerator: VideoGenerator;
+  private voiceGenerator: VoiceGenerator;
   private driveStorage: DriveStorage | null = null;
   private options: PipelineOptions;
 
@@ -126,6 +132,7 @@ export class AdGenerationPipeline {
     this.scriptGenerator = new ScriptGenerator({
       apiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
       useMock: options.useMock,
+      language: options.language || 'ja',
     });
 
     this.imageProcessor = new ImageProcessor({
@@ -138,6 +145,13 @@ export class AdGenerationPipeline {
       replicateApiToken: process.env.REPLICATE_API_TOKEN,
       openaiApiKey: process.env.OPENAI_API_KEY, // For direct billing via Replicate
       useMock: options.mockVideoOnly || options.useMock,
+    });
+
+    // Initialize VoiceGenerator for TTS narration
+    this.voiceGenerator = new VoiceGenerator({
+      apiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
+      model: 'tts-1',
+      useMock: options.useMock,
     });
 
     // Initialize DriveStorage if credentials are provided
@@ -223,10 +237,15 @@ export class AdGenerationPipeline {
       // ============================================================
       const stage3 = await this.executeStage('Persona & Script Generation', async () => {
         this.log('Generating target persona and UGC script...');
+        this.log(`Language setting: ${this.options.language || 'ja'}`);
         const { persona: generatedPersona, script: generatedScript } =
           await this.scriptGenerator.generateFullScript(productAnalysis!);
         this.log(`Persona: ${generatedPersona.name}, ${generatedPersona.age} years old`);
         this.log(`Script scenes: ${generatedScript.scenes.length}`);
+        // Log first scene narration for debugging
+        if (generatedScript.scenes.length > 0) {
+          this.log(`Scene 1 narration: ${generatedScript.scenes[0].narration}`);
+        }
         return { persona: generatedPersona, script: generatedScript };
       });
       stages.push(stage3.stage);
@@ -281,12 +300,21 @@ export class AdGenerationPipeline {
       // ============================================================
       const stage6 = await this.executeStage('Sora2 Video Generation', async () => {
         this.log('Generating video with Sora2...');
-        this.log(`Prompt: ${script!.sora2Prompt.substring(0, 100)}...`);
+        this.log(`Prompt length: ${script!.sora2Prompt?.length || 0} chars`);
+
+        // Validate sora2Prompt
+        if (!script!.sora2Prompt || script!.sora2Prompt.trim() === '') {
+          console.error('❌ [Pipeline] ERROR: sora2Prompt is empty!');
+          console.error('❌ [Pipeline] Script object:', JSON.stringify(script, null, 2));
+          throw new Error('Script generation failed: Empty sora2Prompt');
+        }
+
+        this.log(`Prompt preview: ${script!.sora2Prompt.substring(0, 100)}...`);
 
         const videoResult = await this.videoGenerator.generateAndWait({
           firstFrameImage: resizedBase64,
           prompt: script!.sora2Prompt,
-          duration: 4, // テスト用（本番は12秒）
+          duration: this.options.duration || 12,
           aspectRatio: '9:16',
         });
 
@@ -296,16 +324,51 @@ export class AdGenerationPipeline {
       stages.push(stage6.stage);
 
       if (!stage6.result) {
-        throw new Error('Stage 6 failed: Video generation failed');
+        const errorDetail = stage6.stage.error || 'Unknown error';
+        console.error('❌ [Pipeline] Stage 6 failed with error:', errorDetail);
+        throw new Error(`Stage 6 failed: ${errorDetail}`);
       }
 
       videoUrl = stage6.result.videoResult.videoUrl;
 
       // ============================================================
-      // Stage 7: Google Drive Upload (Optional)
+      // Stage 7: Voice Generation & Audio Merge
+      // ============================================================
+      const stage7 = await this.executeStage('Voice Generation & Merge', async () => {
+        const language = this.options.language || 'ja';
+        this.log(`Generating ${language} voice narration...`);
+
+        // Generate voice from all scene narrations
+        const voiceResult = await this.voiceGenerator.generateForScenes(
+          script!.scenes,
+          language
+        );
+        this.log(`Voice generated: ${voiceResult.duration.toFixed(1)}s`);
+
+        // Merge audio with video
+        this.log('Merging audio with video...');
+        const mergedVideoPath = await this.voiceGenerator.mergeAudioWithVideo({
+          videoPath: videoUrl!,
+          audioPath: voiceResult.audioPath,
+        });
+
+        this.log(`Video with voice created: ${mergedVideoPath}`);
+        return { mergedVideoPath, voiceDuration: voiceResult.duration };
+      });
+      stages.push(stage7.stage);
+
+      // Update videoUrl to point to merged video if successful
+      if (stage7.result) {
+        // For local file, we need to serve it or return the path
+        // For now, keep original URL but note that merged video is available locally
+        this.log(`Merged video available at: ${stage7.result.mergedVideoPath}`);
+      }
+
+      // ============================================================
+      // Stage 8: Google Drive Upload (Optional)
       // ============================================================
       if (this.driveStorage) {
-        const stage7 = await this.executeStage('Google Drive Upload', async () => {
+        const stage8 = await this.executeStage('Google Drive Upload', async () => {
           this.log('Uploading to Google Drive...');
 
           if (!this.driveStorage) {
@@ -341,10 +404,10 @@ export class AdGenerationPipeline {
           this.log(`Uploaded to Drive: ${uploadResult.webViewLink}`);
           return { driveFile: uploadResult };
         });
-        stages.push(stage7.stage);
+        stages.push(stage8.stage);
 
-        if (stage7.result) {
-          driveLink = stage7.result.driveFile.webViewLink;
+        if (stage8.result) {
+          driveLink = stage8.result.driveFile.webViewLink;
         }
       } else {
         stages.push({

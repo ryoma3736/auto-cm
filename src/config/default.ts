@@ -31,7 +31,7 @@ export interface Config {
 export const defaultConfig: Config = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
-    model: 'gpt-4-vision-preview',
+    model: 'gpt-5',
   },
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
