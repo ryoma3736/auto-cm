@@ -82,9 +82,13 @@ export class MovieCreationPipeline {
     return this.imageAnalyzer.analyzeImages(imagePaths);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async generateScript(analysisResults: any[]) {
-    return this.scriptGenerator.generateScript(analysisResults);
+  /**
+   * Generate UGC script from product analysis
+   * @param analysis - Product analysis result
+   * @returns Generated persona and script
+   */
+  async generateScript(analysis: import('../modules/image-analyzer/vision-analyzer.js').ProductAnalysis) {
+    return this.scriptGenerator.generateFullScript(analysis);
   }
 
   async processImages(_imagePaths: string[]) {
