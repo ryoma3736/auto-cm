@@ -51,8 +51,8 @@ export class MovieCreationPipeline {
     });
 
     this.videoGenerator = new VideoGenerator({
-      sora2ApiKey: config.sora2.apiKey,
-      sora2Endpoint: config.sora2.endpoint,
+      apiKey: config.sora2.apiKey,
+      baseUrl: config.sora2.endpoint,
     });
 
     this.storage = new Storage({
@@ -96,8 +96,16 @@ export class MovieCreationPipeline {
     throw new Error('Not implemented yet');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async generateVideo(imagePaths: string[], script: any, outputPath: string) {
-    return this.videoGenerator.generateVideo(imagePaths, script, outputPath);
+  /**
+   * Generate video using the new VideoGenerator API
+   * @param firstFrameImage - Base64 encoded first frame
+   * @param prompt - Video generation prompt
+   * @returns Video generation result
+   */
+  async generateVideo(firstFrameImage: string, prompt: string) {
+    return this.videoGenerator.generateAndWait({
+      firstFrameImage,
+      prompt,
+    });
   }
 }
