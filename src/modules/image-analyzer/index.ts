@@ -28,7 +28,7 @@ export class ImageAnalyzer {
   /**
    * Analyze a single image
    */
-  async analyzeImage(imagePath: string): Promise<ImageAnalysisResult> {
+  async analyzeImage(_imagePath: string): Promise<ImageAnalysisResult> {
     // TODO: Implement GPT-4 Vision API call
     throw new Error('Not implemented yet');
   }
@@ -36,8 +36,17 @@ export class ImageAnalyzer {
   /**
    * Analyze multiple images in batch
    */
-  async analyzeImages(imagePaths: string[]): Promise<ImageAnalysisResult[]> {
+  async analyzeImages(_imagePaths: string[]): Promise<ImageAnalysisResult[]> {
     // TODO: Implement batch analysis
     throw new Error('Not implemented yet');
   }
 }
+
+// Export image input module
+export {
+  ImageInputModule,
+  createImageInputModule,
+  type ImageData,
+  type ValidationResult,
+  type ImageInputOptions,
+} from './image-input.js';

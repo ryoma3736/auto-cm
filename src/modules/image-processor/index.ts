@@ -3,6 +3,8 @@
  * Processes images using NanoBanana API and Sharp
  */
 
+import sharp from 'sharp';
+
 export interface ImageProcessingOptions {
   width?: number;
   height?: number;
@@ -23,7 +25,34 @@ export interface ImageProcessorConfig {
   nanoBananaEndpoint: string;
 }
 
-export class ImageProcessor {
+/**
+ * Options for extending an image to vertical format (9:16)
+ */
+export interface ExtendOptions {
+  targetAspectRatio: '9:16';
+  backgroundColor: string; // Default: '#FFFFFF'
+  preserveOriginal: boolean;
+}
+
+/**
+ * Result of extending an image
+ */
+export interface ExtendedImage {
+  base64: string;
+  width: number;
+  height: number;
+  originalPosition: { x: number; y: number };
+}
+
+/**
+ * Interface for image extension functionality
+ */
+export interface ImageExtender {
+  extendToVertical(imageBase64: string, options: ExtendOptions): Promise<ExtendedImage>;
+  addPadding(imageBase64: string, targetWidth: number, targetHeight: number): Promise<string>;
+}
+
+export class ImageProcessor implements ImageExtender {
   private config: ImageProcessorConfig;
 
   constructor(config: ImageProcessorConfig) {
@@ -34,9 +63,9 @@ export class ImageProcessor {
    * Resize and optimize an image
    */
   async processImage(
-    inputPath: string,
-    outputPath: string,
-    options: ImageProcessingOptions = {}
+    _inputPath: string,
+    _outputPath: string,
+    _options: ImageProcessingOptions = {}
   ): Promise<ProcessedImage> {
     // TODO: Implement image processing with Sharp
     throw new Error('Not implemented yet');
@@ -45,7 +74,7 @@ export class ImageProcessor {
   /**
    * Generate additional images using NanoBanana API
    */
-  async generateImage(prompt: string, outputPath: string): Promise<ProcessedImage> {
+  async generateImage(_prompt: string, _outputPath: string): Promise<ProcessedImage> {
     // TODO: Implement image generation using NanoBanana API
     throw new Error('Not implemented yet');
   }
@@ -54,9 +83,139 @@ export class ImageProcessor {
    * Batch process multiple images
    */
   async processImages(
-    inputs: Array<{ inputPath: string; outputPath: string; options?: ImageProcessingOptions }>
+    _inputs: Array<{ inputPath: string; outputPath: string; options?: ImageProcessingOptions }>
   ): Promise<ProcessedImage[]> {
     // TODO: Implement batch processing
     throw new Error('Not implemented yet');
+  }
+
+  /**
+   * Extend an image to vertical (9:16) format using local fallback with sharp
+   * Centers the original image and fills remaining space with background color
+   *
+   * @param imageBase64 - Base64 encoded image string
+   * @param options - Extension options (aspect ratio, background color, etc.)
+   * @returns Extended image with metadata
+   */
+  async extendToVertical(imageBase64: string, options: ExtendOptions): Promise<ExtendedImage> {
+    // Remove data URI prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Get original image metadata
+    const metadata = await sharp(imageBuffer).metadata();
+    if (!metadata.width || !metadata.height) {
+      throw new Error('Unable to read image dimensions');
+    }
+
+    const originalWidth = metadata.width;
+    const originalHeight = metadata.height;
+
+    // Calculate target dimensions for 9:16 aspect ratio
+    // Target height should be (width * 16) / 9
+    const targetHeight = Math.ceil(originalWidth * (16 / 9));
+
+    // Calculate padding needed (top and bottom)
+    const totalPadding = Math.max(0, targetHeight - originalHeight);
+    const topPadding = Math.floor(totalPadding / 2);
+    const bottomPadding = Math.ceil(totalPadding / 2);
+
+    // Parse background color (hex to RGB)
+    const bgColor = this.parseHexColor(options.backgroundColor || '#FFFFFF');
+
+    // Extend the image with sharp
+    const extendedBuffer = await sharp(imageBuffer)
+      .extend({
+        top: topPadding,
+        bottom: bottomPadding,
+        left: 0,
+        right: 0,
+        background: bgColor,
+      })
+      .toBuffer();
+
+    // Convert result to base64
+    const resultBase64 = extendedBuffer.toString('base64');
+    const resultMetadata = await sharp(extendedBuffer).metadata();
+
+    return {
+      base64: `data:image/${metadata.format || 'png'};base64,${resultBase64}`,
+      width: resultMetadata.width || originalWidth,
+      height: resultMetadata.height || targetHeight,
+      originalPosition: {
+        x: 0,
+        y: topPadding,
+      },
+    };
+  }
+
+  /**
+   * Add padding to an image to reach target dimensions
+   * Centers the image and fills with white background
+   *
+   * @param imageBase64 - Base64 encoded image string
+   * @param targetWidth - Target width in pixels
+   * @param targetHeight - Target height in pixels
+   * @returns Base64 encoded padded image
+   */
+  async addPadding(imageBase64: string, targetWidth: number, targetHeight: number): Promise<string> {
+    // Remove data URI prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Get original image metadata
+    const metadata = await sharp(imageBuffer).metadata();
+    if (!metadata.width || !metadata.height) {
+      throw new Error('Unable to read image dimensions');
+    }
+
+    const originalWidth = metadata.width;
+    const originalHeight = metadata.height;
+
+    // Calculate padding needed
+    const horizontalPadding = Math.max(0, targetWidth - originalWidth);
+    const verticalPadding = Math.max(0, targetHeight - originalHeight);
+
+    const leftPadding = Math.floor(horizontalPadding / 2);
+    const rightPadding = Math.ceil(horizontalPadding / 2);
+    const topPadding = Math.floor(verticalPadding / 2);
+    const bottomPadding = Math.ceil(verticalPadding / 2);
+
+    // Extend the image with white background
+    const paddedBuffer = await sharp(imageBuffer)
+      .extend({
+        top: topPadding,
+        bottom: bottomPadding,
+        left: leftPadding,
+        right: rightPadding,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .toBuffer();
+
+    // Convert result to base64
+    const resultBase64 = paddedBuffer.toString('base64');
+    return `data:image/${metadata.format || 'png'};base64,${resultBase64}`;
+  }
+
+  /**
+   * Parse hex color to RGB object for sharp
+   * @param hex - Hex color string (e.g., '#FFFFFF' or '#FFF')
+   * @returns RGB color object
+   */
+  private parseHexColor(hex: string): { r: number; g: number; b: number; alpha: number } {
+    // Remove # if present
+    const cleanHex = hex.replace(/^#/, '');
+
+    // Handle 3-digit hex
+    const fullHex = cleanHex.length === 3
+      ? cleanHex.split('').map(char => char + char).join('')
+      : cleanHex;
+
+    // Parse RGB values
+    const r = parseInt(fullHex.substring(0, 2), 16);
+    const g = parseInt(fullHex.substring(2, 4), 16);
+    const b = parseInt(fullHex.substring(4, 6), 16);
+
+    return { r, g, b, alpha: 1 };
   }
 }

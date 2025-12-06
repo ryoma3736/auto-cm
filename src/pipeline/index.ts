@@ -65,7 +65,7 @@ export class MovieCreationPipeline {
   /**
    * Execute the complete movie creation pipeline
    */
-  async execute(inputImages: string[]): Promise<PipelineResult> {
+  async execute(_inputImages: string[]): Promise<PipelineResult> {
     // TODO: Implement full pipeline
     // 1. Analyze images
     // 2. Generate script
@@ -82,15 +82,17 @@ export class MovieCreationPipeline {
     return this.imageAnalyzer.analyzeImages(imagePaths);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async generateScript(analysisResults: any[]) {
     return this.scriptGenerator.generateScript(analysisResults);
   }
 
-  async processImages(imagePaths: string[]) {
+  async processImages(_imagePaths: string[]) {
     // TODO: Implement image processing step
     throw new Error('Not implemented yet');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async generateVideo(imagePaths: string[], script: any, outputPath: string) {
     return this.videoGenerator.generateVideo(imagePaths, script, outputPath);
   }

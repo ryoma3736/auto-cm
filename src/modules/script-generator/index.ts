@@ -38,7 +38,7 @@ export class ScriptGenerator {
   /**
    * Generate a movie script from image analysis results
    */
-  async generateScript(analyses: ImageAnalysisResult[]): Promise<MovieScript> {
+  async generateScript(_analyses: ImageAnalysisResult[]): Promise<MovieScript> {
     // TODO: Implement script generation using GPT-4
     throw new Error('Not implemented yet');
   }
@@ -46,7 +46,7 @@ export class ScriptGenerator {
   /**
    * Refine an existing script
    */
-  async refineScript(script: MovieScript, feedback: string): Promise<MovieScript> {
+  async refineScript(_script: MovieScript, _feedback: string): Promise<MovieScript> {
     // TODO: Implement script refinement
     throw new Error('Not implemented yet');
   }

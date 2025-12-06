@@ -35,9 +35,9 @@ export class Storage {
    * Upload a file to Google Drive
    */
   async uploadToGoogleDrive(
-    filePath: string,
-    fileName: string,
-    folderId?: string
+    _filePath: string,
+    _fileName: string,
+    _folderId?: string
   ): Promise<UploadResult> {
     // TODO: Implement Google Drive upload
     throw new Error('Not implemented yet');
@@ -46,7 +46,7 @@ export class Storage {
   /**
    * List files in Google Drive folder
    */
-  async listFiles(folderId?: string): Promise<Array<{ id: string; name: string; size: number }>> {
+  async listFiles(_folderId?: string): Promise<Array<{ id: string; name: string; size: number }>> {
     // TODO: Implement file listing
     throw new Error('Not implemented yet');
   }
@@ -54,7 +54,7 @@ export class Storage {
   /**
    * Delete a file from Google Drive
    */
-  async deleteFile(fileId: string): Promise<void> {
+  async deleteFile(_fileId: string): Promise<void> {
     // TODO: Implement file deletion
     throw new Error('Not implemented yet');
   }

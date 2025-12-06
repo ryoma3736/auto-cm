@@ -34,10 +34,10 @@ export class VideoGenerator {
    * Generate a video from images and script
    */
   async generateVideo(
-    imagePaths: string[],
-    script: MovieScript,
-    outputPath: string,
-    options: VideoGenerationOptions = {}
+    _imagePaths: string[],
+    _script: MovieScript,
+    _outputPath: string,
+    _options: VideoGenerationOptions = {}
   ): Promise<GeneratedVideo> {
     // TODO: Implement video generation using Sora2 API
     throw new Error('Not implemented yet');
@@ -46,7 +46,7 @@ export class VideoGenerator {
   /**
    * Check video generation status (for async jobs)
    */
-  async checkStatus(jobId: string): Promise<{ status: string; progress: number }> {
+  async checkStatus(_jobId: string): Promise<{ status: string; progress: number }> {
     // TODO: Implement status check
     throw new Error('Not implemented yet');
   }
@@ -54,7 +54,7 @@ export class VideoGenerator {
   /**
    * Cancel a video generation job
    */
-  async cancelJob(jobId: string): Promise<void> {
+  async cancelJob(_jobId: string): Promise<void> {
     // TODO: Implement job cancellation
     throw new Error('Not implemented yet');
   }
