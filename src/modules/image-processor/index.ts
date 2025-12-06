@@ -45,6 +45,36 @@ export interface ExtendedImage {
 }
 
 /**
+ * Options for resizing an image
+ */
+export interface ResizeOptions {
+  width: number;
+  height: number;
+  quality?: number; // 1-100, default 90
+  format?: 'png' | 'jpeg' | 'webp';
+  fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+}
+
+/**
+ * Result of resizing an image
+ */
+export interface ResizedImage {
+  base64: string;
+  width: number;
+  height: number;
+  format: string;
+  sizeBytes: number;
+}
+
+/**
+ * Interface for image resizing functionality
+ */
+export interface ImageResizer {
+  resize(imageBase64: string, options: ResizeOptions): Promise<ResizedImage>;
+  resizeTo720x1280(imageBase64: string): Promise<ResizedImage>;
+}
+
+/**
  * Interface for image extension functionality
  */
 export interface ImageExtender {
@@ -52,7 +82,7 @@ export interface ImageExtender {
   addPadding(imageBase64: string, targetWidth: number, targetHeight: number): Promise<string>;
 }
 
-export class ImageProcessor implements ImageExtender {
+export class ImageProcessor implements ImageExtender, ImageResizer {
   private config: ImageProcessorConfig;
 
   constructor(config: ImageProcessorConfig) {
@@ -217,5 +247,75 @@ export class ImageProcessor implements ImageExtender {
     const b = parseInt(fullHex.substring(4, 6), 16);
 
     return { r, g, b, alpha: 1 };
+  }
+
+  /**
+   * Resize an image to specified dimensions with quality control
+   * Supports multiple fit modes and output formats
+   *
+   * @param imageBase64 - Base64 encoded image string
+   * @param options - Resize options (width, height, quality, format, fit)
+   * @returns Resized image with metadata
+   */
+  async resize(imageBase64: string, options: ResizeOptions): Promise<ResizedImage> {
+    // Remove data URI prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Get original image metadata
+    const metadata = await sharp(imageBuffer).metadata();
+    if (!metadata.width || !metadata.height) {
+      throw new Error('Unable to read image dimensions');
+    }
+
+    // Set default values
+    const quality = options.quality ?? 90;
+    const format = options.format ?? 'jpeg';
+    const fit = options.fit ?? 'contain';
+
+    // Prepare sharp instance with resize options
+    let sharpInstance = sharp(imageBuffer).resize(options.width, options.height, {
+      fit,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    });
+
+    // Apply format-specific options
+    if (format === 'jpeg') {
+      sharpInstance = sharpInstance.jpeg({ quality });
+    } else if (format === 'png') {
+      sharpInstance = sharpInstance.png({ quality });
+    } else if (format === 'webp') {
+      sharpInstance = sharpInstance.webp({ quality });
+    }
+
+    // Process the image
+    const resizedBuffer = await sharpInstance.toBuffer();
+    const resizedMetadata = await sharp(resizedBuffer).metadata();
+
+    // Return result
+    return {
+      base64: `data:image/${format};base64,${resizedBuffer.toString('base64')}`,
+      width: resizedMetadata.width || options.width,
+      height: resizedMetadata.height || options.height,
+      format,
+      sizeBytes: resizedBuffer.length,
+    };
+  }
+
+  /**
+   * Convenience method to resize image to 720x1280 (Sora 2 compatible dimensions)
+   * Uses 'contain' fit mode to preserve aspect ratio with white background
+   *
+   * @param imageBase64 - Base64 encoded image string
+   * @returns Resized image at 720x1280 with high quality JPEG encoding
+   */
+  async resizeTo720x1280(imageBase64: string): Promise<ResizedImage> {
+    return this.resize(imageBase64, {
+      width: 720,
+      height: 1280,
+      quality: 90,
+      format: 'jpeg',
+      fit: 'contain',
+    });
   }
 }

@@ -50,3 +50,12 @@ export {
   type ValidationResult,
   type ImageInputOptions,
 } from './image-input.js';
+
+// Export vision analyzer module
+export {
+  VisionAnalyzer,
+  createVisionAnalyzer,
+  type ProductAnalysis,
+  type ProductType,
+  type VisionAnalyzerOptions,
+} from './vision-analyzer.js';
