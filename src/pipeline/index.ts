@@ -79,8 +79,10 @@ export interface PipelineOptions {
   /** Google Drive credentials (object or path) */
   googleDriveCredentials?: object;
   googleDriveCredentialsPath?: string;
-  /** Use mock implementations (for testing) */
+  /** Use mock implementations for ALL modules (for testing) */
   useMock?: boolean;
+  /** Mock only video generation (Sora API not public yet) - uses real Vision/GPT-4 */
+  mockVideoOnly?: boolean;
   /** Enable verbose logging */
   verbose?: boolean;
 }
@@ -131,9 +133,11 @@ export class AdGenerationPipeline {
       nanoBananaEndpoint: process.env.NANOBANANA_ENDPOINT || '',
     });
 
+    // Use mock for video if mockVideoOnly is true OR if useMock is true for all modules
     this.videoGenerator = new VideoGenerator({
-      apiKey: process.env.SORA2_API_KEY || process.env.OPENAI_API_KEY,
-      useMock: options.useMock,
+      replicateApiToken: process.env.REPLICATE_API_TOKEN,
+      openaiApiKey: process.env.OPENAI_API_KEY, // For direct billing via Replicate
+      useMock: options.mockVideoOnly || options.useMock,
     });
 
     // Initialize DriveStorage if credentials are provided
@@ -282,7 +286,7 @@ export class AdGenerationPipeline {
         const videoResult = await this.videoGenerator.generateAndWait({
           firstFrameImage: resizedBase64,
           prompt: script!.sora2Prompt,
-          duration: 12,
+          duration: 4, // テスト用（本番は12秒）
           aspectRatio: '9:16',
         });
 

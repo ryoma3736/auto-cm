@@ -10,6 +10,7 @@
  */
 
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { ProductAnalysis } from '../image-analyzer/vision-analyzer.js';
 
 /**
@@ -70,24 +71,32 @@ export interface UGCScript {
 export interface ScriptGeneratorOptions {
   /** OpenAI API key */
   apiKey?: string;
+  /** Google Gemini API key (preferred) */
+  geminiApiKey?: string;
   /** OpenAI model to use (default: gpt-4o) */
   model?: string;
+  /** Gemini model to use (default: gemini-2.0-flash-exp) */
+  geminiModel?: string;
   /** Maximum retry attempts on failure */
   maxRetries?: number;
   /** Script duration in seconds (default: 12) */
   targetDuration?: number;
   /** Use mock implementation (for testing) */
   useMock?: boolean;
+  /** Use Gemini as primary provider (default: true) */
+  useGeminiPrimary?: boolean;
 }
 
 /**
  * Default configuration
  */
-const DEFAULT_OPTIONS: Required<Omit<ScriptGeneratorOptions, 'apiKey'>> = {
+const DEFAULT_OPTIONS: Required<Omit<ScriptGeneratorOptions, 'apiKey' | 'geminiApiKey'>> = {
   model: 'gpt-4o',
+  geminiModel: 'gemini-2.0-flash-exp',
   maxRetries: 3,
   targetDuration: 12,
   useMock: false,
+  useGeminiPrimary: true, // Gemini is now the default
 };
 
 /**
@@ -164,6 +173,7 @@ const SCRIPT_GENERATION_PROMPT = `あなたはUGC広告のスクリプトライ�
 export class ScriptGenerator {
   private options: Required<ScriptGeneratorOptions>;
   private openai?: OpenAI;
+  private gemini?: GoogleGenerativeAI;
   private useMock: boolean;
 
   constructor(options: ScriptGeneratorOptions = {}) {
@@ -173,6 +183,7 @@ export class ScriptGenerator {
     this.options = {
       ...DEFAULT_OPTIONS,
       apiKey: options.apiKey || process.env.OPENAI_API_KEY,
+      geminiApiKey: options.geminiApiKey || process.env.GEMINI_API_KEY,
       useMock: this.useMock,
       ...options,
     } as Required<ScriptGeneratorOptions>;
@@ -182,15 +193,22 @@ export class ScriptGenerator {
       return;
     }
 
-    // Validate API key
-    if (!this.options.apiKey) {
-      throw new Error('ScriptGenerator requires OPENAI_API_KEY');
+    // Initialize Gemini client if API key is available (preferred)
+    if (this.options.geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(this.options.geminiApiKey);
     }
 
-    // Initialize OpenAI client
-    this.openai = new OpenAI({
-      apiKey: this.options.apiKey,
-    });
+    // Initialize OpenAI client if API key is available (fallback)
+    if (this.options.apiKey) {
+      this.openai = new OpenAI({
+        apiKey: this.options.apiKey,
+      });
+    }
+
+    // Validate that at least one provider is configured
+    if (!this.gemini && !this.openai) {
+      throw new Error('ScriptGenerator requires GEMINI_API_KEY or OPENAI_API_KEY');
+    }
   }
 
   /**
@@ -206,39 +224,33 @@ export class ScriptGenerator {
       return this.generatePersonaMock(analysis);
     }
 
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized');
-    }
-
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
       try {
         const prompt = this.buildPersonaPrompt(analysis);
 
-        const response = await this.openai.chat.completions.create({
-          model: this.options.model,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a marketing expert specializing in persona creation.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          response_format: { type: 'json_object' },
-          max_tokens: 1000,
-          temperature: 0.7, // Higher temperature for creative persona
-        });
-
-        const content = response.choices[0]?.message?.content;
-        if (!content) {
-          throw new Error('No response content from OpenAI API');
+        // Try Gemini first if available and preferred
+        if (this.options.useGeminiPrimary && this.gemini) {
+          try {
+            return await this.generateWithGemini(prompt, 'persona');
+          } catch (geminiError) {
+            lastError = geminiError instanceof Error ? geminiError : new Error(String(geminiError));
+            console.log(`Gemini persona generation failed, trying fallback: ${lastError.message}`);
+            // Fallback to OpenAI
+            if (this.openai) {
+              return await this.generateWithOpenAI(prompt, 'persona');
+            }
+            throw geminiError;
+          }
         }
 
-        return this.parsePersonaResponse(content);
+        // Use OpenAI if Gemini is not primary or not available
+        if (this.openai) {
+          return await this.generateWithOpenAI(prompt, 'persona');
+        }
+
+        throw new Error('No available AI provider');
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -270,39 +282,33 @@ export class ScriptGenerator {
       return this.generateScriptMock(persona, analysis);
     }
 
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized');
-    }
-
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
       try {
         const prompt = this.buildScriptPrompt(persona, analysis);
 
-        const response = await this.openai.chat.completions.create({
-          model: this.options.model,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a UGC advertisement scriptwriter.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          response_format: { type: 'json_object' },
-          max_tokens: 2000,
-          temperature: 0.8, // High temperature for creative script
-        });
-
-        const content = response.choices[0]?.message?.content;
-        if (!content) {
-          throw new Error('No response content from OpenAI API');
+        // Try Gemini first if available and preferred
+        if (this.options.useGeminiPrimary && this.gemini) {
+          try {
+            return await this.generateWithGemini(prompt, 'script');
+          } catch (geminiError) {
+            lastError = geminiError instanceof Error ? geminiError : new Error(String(geminiError));
+            console.log(`Gemini script generation failed, trying fallback: ${lastError.message}`);
+            // Fallback to OpenAI
+            if (this.openai) {
+              return await this.generateWithOpenAI(prompt, 'script');
+            }
+            throw geminiError;
+          }
         }
 
-        return this.parseScriptResponse(content);
+        // Use OpenAI if Gemini is not primary or not available
+        if (this.openai) {
+          return await this.generateWithOpenAI(prompt, 'script');
+        }
+
+        throw new Error('No available AI provider');
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -336,6 +342,75 @@ export class ScriptGenerator {
     const script = await this.generateScript(persona, analysis);
 
     return { persona, script };
+  }
+
+  /**
+   * Generate content using Gemini API
+   */
+  private async generateWithGemini<T>(prompt: string, type: 'persona' | 'script'): Promise<T> {
+    if (!this.gemini) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    const model = this.gemini.getGenerativeModel({ model: this.options.geminiModel });
+
+    const systemPrompt = type === 'persona'
+      ? 'You are a marketing expert specializing in persona creation. Return only valid JSON.'
+      : 'You are a UGC advertisement scriptwriter. Return only valid JSON.';
+
+    const response = await model.generateContent([
+      { text: systemPrompt + '\n\n' + prompt + '\n\nJSON形式のみで返答してください。' }
+    ]);
+
+    const content = response.response.text();
+    if (!content) {
+      throw new Error('No response content from Gemini API');
+    }
+
+    // Extract JSON from response
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const jsonString = jsonMatch ? jsonMatch[1] : content;
+
+    if (type === 'persona') {
+      return this.parsePersonaResponse(jsonString) as T;
+    } else {
+      return this.parseScriptResponse(jsonString) as T;
+    }
+  }
+
+  /**
+   * Generate content using OpenAI API
+   */
+  private async generateWithOpenAI<T>(prompt: string, type: 'persona' | 'script'): Promise<T> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const systemContent = type === 'persona'
+      ? 'You are a marketing expert specializing in persona creation.'
+      : 'You are a UGC advertisement scriptwriter.';
+
+    const response = await this.openai.chat.completions.create({
+      model: this.options.model,
+      messages: [
+        { role: 'system', content: systemContent },
+        { role: 'user', content: prompt },
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: type === 'persona' ? 1000 : 2000,
+      temperature: type === 'persona' ? 0.7 : 0.8,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response content from OpenAI API');
+    }
+
+    if (type === 'persona') {
+      return this.parsePersonaResponse(content) as T;
+    } else {
+      return this.parseScriptResponse(content) as T;
+    }
   }
 
   /**

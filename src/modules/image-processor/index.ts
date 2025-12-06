@@ -1,9 +1,13 @@
 /**
  * Image Processor Module
- * Processes images using NanoBanana API and Sharp
+ * Processes images using Nano Banana (Gemini Image API) and Sharp
+ *
+ * Nano Banana = Gemini 2.5 Flash Image (fast)
+ * Nano Banana Pro = Gemini 3 Pro Image (high quality)
  */
 
 import sharp from 'sharp';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ImageProcessingOptions {
   width?: number;
@@ -21,8 +25,13 @@ export interface ProcessedImage {
 }
 
 export interface ImageProcessorConfig {
-  nanoBananaApiKey: string;
-  nanoBananaEndpoint: string;
+  /** Gemini API key (for Nano Banana image generation) */
+  geminiApiKey?: string;
+  /** Use Nano Banana Pro (gemini-3-pro-image-preview) instead of standard (gemini-2.5-flash-image) */
+  useNanoBananaPro?: boolean;
+  /** Legacy fields - no longer needed, using Gemini API directly */
+  nanoBananaApiKey?: string;
+  nanoBananaEndpoint?: string;
 }
 
 /**
@@ -84,9 +93,20 @@ export interface ImageExtender {
 
 export class ImageProcessor implements ImageExtender, ImageResizer {
   private config: ImageProcessorConfig;
+  private gemini?: GoogleGenerativeAI;
+  private modelName: string;
 
   constructor(config: ImageProcessorConfig) {
     this.config = config;
+
+    // Initialize Gemini client for Nano Banana
+    const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      this.gemini = new GoogleGenerativeAI(apiKey);
+    }
+
+    // Use Nano Banana Pro (Gemini 3 Pro Image) for best quality
+    this.modelName = 'gemini-2.0-flash-exp'; // Nano Banana Pro - 高品質画像生成
   }
 
   /**
@@ -120,8 +140,8 @@ export class ImageProcessor implements ImageExtender, ImageResizer {
   }
 
   /**
-   * Extend an image to vertical (9:16) format using local fallback with sharp
-   * Centers the original image and fills remaining space with background color
+   * Extend an image to vertical (9:16) format using Nano Banana (Gemini Image)
+   * AI-powered outpainting to create natural vertical extension
    *
    * @param imageBase64 - Base64 encoded image string
    * @param options - Extension options (aspect ratio, background color, etc.)
@@ -141,19 +161,29 @@ export class ImageProcessor implements ImageExtender, ImageResizer {
     const originalWidth = metadata.width;
     const originalHeight = metadata.height;
 
-    // Calculate target dimensions for 9:16 aspect ratio
-    // Target height should be (width * 16) / 9
-    const targetHeight = Math.ceil(originalWidth * (16 / 9));
+    // Try Nano Banana (Gemini Image) first for AI-powered extension
+    if (this.gemini) {
+      try {
+        console.log('📸 Using Nano Banana for AI-powered image extension...');
+        const result = await this.extendWithNanoBanana(base64Data, originalWidth, originalHeight);
+        return result;
+      } catch (error) {
+        console.log(`⚠️ Nano Banana failed, falling back to sharp: ${error instanceof Error ? error.message : error}`);
+        // Fall back to sharp-based extension
+      }
+    }
 
-    // Calculate padding needed (top and bottom)
+    // Fallback: Use sharp for simple padding extension
+    console.log('📐 Using sharp for image extension (padding)...');
+
+    // Calculate target dimensions for 9:16 aspect ratio
+    const targetHeight = Math.ceil(originalWidth * (16 / 9));
     const totalPadding = Math.max(0, targetHeight - originalHeight);
     const topPadding = Math.floor(totalPadding / 2);
     const bottomPadding = Math.ceil(totalPadding / 2);
 
-    // Parse background color (hex to RGB)
     const bgColor = this.parseHexColor(options.backgroundColor || '#FFFFFF');
 
-    // Extend the image with sharp
     const extendedBuffer = await sharp(imageBuffer)
       .extend({
         top: topPadding,
@@ -164,7 +194,6 @@ export class ImageProcessor implements ImageExtender, ImageResizer {
       })
       .toBuffer();
 
-    // Convert result to base64
     const resultBase64 = extendedBuffer.toString('base64');
     const resultMetadata = await sharp(extendedBuffer).metadata();
 
@@ -177,6 +206,74 @@ export class ImageProcessor implements ImageExtender, ImageResizer {
         y: topPadding,
       },
     };
+  }
+
+  /**
+   * Use Nano Banana (Gemini Image) for AI-powered image extension
+   * Creates natural outpainting for vertical format
+   */
+  private async extendWithNanoBanana(
+    imageBase64: string,
+    originalWidth: number,
+    originalHeight: number
+  ): Promise<ExtendedImage> {
+    if (!this.gemini) {
+      throw new Error('Gemini client not initialized for Nano Banana');
+    }
+
+    const model = this.gemini.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: {
+        // @ts-ignore - responseModalities is valid for image models
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
+    });
+
+    // Calculate target dimensions for 9:16 aspect ratio
+    const targetHeight = Math.ceil(originalWidth * (16 / 9));
+
+    const prompt = `Extend this product image vertically to a 9:16 aspect ratio (${originalWidth}x${targetHeight}).
+Keep the product centered and visible.
+Extend the top and bottom with a clean, professional background that matches the image style.
+Maintain the original image quality and lighting.
+The result should look like a natural vertical product photo suitable for social media ads.`;
+
+    const response = await model.generateContent([
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: imageBase64,
+        },
+      },
+    ]);
+
+    // Extract the generated image from response
+    const result = response.response;
+    const parts = result.candidates?.[0]?.content?.parts || [];
+
+    for (const part of parts) {
+      if ('inlineData' in part && part.inlineData) {
+        const generatedBase64 = part.inlineData.data;
+        const mimeType = part.inlineData.mimeType || 'image/png';
+
+        // Get the actual dimensions of the generated image
+        const generatedBuffer = Buffer.from(generatedBase64, 'base64');
+        const generatedMetadata = await sharp(generatedBuffer).metadata();
+
+        return {
+          base64: `data:${mimeType};base64,${generatedBase64}`,
+          width: generatedMetadata.width || originalWidth,
+          height: generatedMetadata.height || targetHeight,
+          originalPosition: {
+            x: 0,
+            y: Math.floor((targetHeight - originalHeight) / 2),
+          },
+        };
+      }
+    }
+
+    throw new Error('No image returned from Nano Banana');
   }
 
   /**

@@ -29,11 +29,17 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.24.1",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.0.0",
     "axios": "^1.7.9",
     "commander": "^14.0.2",
     "dotenv": "^16.4.7",
+    "express": "^5.2.1",
     "googleapis": "^144.0.0",
+    "multer": "^2.0.2",
     "openai": "^4.77.3",
+    "replicate": "^1.4.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {

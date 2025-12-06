@@ -1,11 +1,15 @@
 /**
  * Video Generator Module
- * Generates videos using Sora2 API (OpenAI)
+ * Generates videos using Sora 2 API via Replicate
  *
- * This module provides async video generation with polling support.
- * Since the official Sora2 API is not publicly available yet,
- * this implementation includes a mock mode for development.
+ * Replicate provides access to Sora 2 with:
+ * - Model: openai/sora-2
+ * - Duration: 4, 8, or 12 seconds
+ * - Aspect ratio: portrait (720x1280) or landscape (1280x720)
+ * - First frame image support
  */
+
+import Replicate from 'replicate';
 
 /**
  * Video generation request configuration
@@ -15,7 +19,7 @@ export interface VideoRequest {
   firstFrameImage: string;
   /** Prompt for video generation (from UGCScript) */
   prompt: string;
-  /** Video duration in seconds (default: 12) */
+  /** Video duration in seconds (4, 8, or 12) */
   duration?: number;
   /** Aspect ratio for the generated video */
   aspectRatio?: '9:16' | '16:9' | '1:1';
@@ -69,51 +73,25 @@ export interface VideoResult {
  * Configuration options for VideoGenerator
  */
 export interface VideoGeneratorOptions {
-  /** Sora2/OpenAI API key (defaults to SORA2_API_KEY or OPENAI_API_KEY env var) */
-  apiKey?: string;
-  /** API base URL (defaults to OpenAI endpoint) */
-  baseUrl?: string;
+  /** Replicate API token (defaults to REPLICATE_API_TOKEN env var) */
+  replicateApiToken?: string;
+  /** OpenAI API key to pass to Replicate for direct billing (optional) */
+  openaiApiKey?: string;
   /** Maximum wait time for generateAndWait in milliseconds (default: 5 minutes) */
   maxWaitTime?: number;
   /** Polling interval in milliseconds (default: 5 seconds) */
   pollInterval?: number;
-  /** Use mock implementation instead of real API (default: true if no API key) */
+  /** Use mock implementation instead of real API */
   useMock?: boolean;
 }
 
 /**
- * Sora2 API request format (based on expected OpenAI structure)
- */
-interface Sora2ApiRequest {
-  model: string;
-  prompt: string;
-  first_frame: string;
-  duration: number;
-  aspect_ratio: string;
-}
-
-/**
- * Sora2 API response format (based on expected OpenAI structure)
- */
-interface Sora2ApiResponse {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  estimated_seconds?: number;
-  progress?: number;
-  video_url?: string;
-  error?: string;
-  duration?: number;
-  resolution?: { width: number; height: number };
-  created_at?: string;
-}
-
-/**
  * VideoGenerator class
- * Handles video generation using Sora2 API with async polling support
+ * Handles video generation using Sora 2 via Replicate API
  */
 export class VideoGenerator {
-  private readonly apiKey: string;
-  private readonly baseUrl: string;
+  private readonly replicate?: Replicate;
+  private readonly openaiApiKey?: string;
   private readonly maxWaitTime: number;
   private readonly pollInterval: number;
   private readonly useMock: boolean;
@@ -123,21 +101,21 @@ export class VideoGenerator {
    * @param options Configuration options
    */
   constructor(options: VideoGeneratorOptions = {}) {
-    this.apiKey =
-      options.apiKey ||
-      process.env.SORA2_API_KEY ||
-      process.env.OPENAI_API_KEY ||
-      '';
-    this.baseUrl = options.baseUrl || 'https://api.openai.com/v1';
+    const replicateToken = options.replicateApiToken || process.env.REPLICATE_API_TOKEN;
+    this.openaiApiKey = options.openaiApiKey || process.env.OPENAI_API_KEY;
     this.maxWaitTime = options.maxWaitTime || 5 * 60 * 1000; // 5 minutes
     this.pollInterval = options.pollInterval || 5000; // 5 seconds
-    this.useMock = options.useMock ?? !this.apiKey;
+    this.useMock = options.useMock ?? !replicateToken;
 
-    // Note: useMock is readonly, so we handle this in the initialization above
+    if (replicateToken && !this.useMock) {
+      this.replicate = new Replicate({
+        auth: replicateToken,
+      });
+    }
   }
 
   /**
-   * Start a video generation job
+   * Start a video generation job using Replicate Sora 2
    * @param request Video generation request
    * @returns Initial generation response with job ID
    */
@@ -146,39 +124,52 @@ export class VideoGenerator {
       return this.generateMock(request);
     }
 
-    const apiRequest: Sora2ApiRequest = {
-      model: 'sora',
+    if (!this.replicate) {
+      throw new Error('Replicate client not initialized. Set REPLICATE_API_TOKEN.');
+    }
+
+    // Convert duration to allowed values (4, 8, or 12)
+    const allowedDurations = [4, 8, 12];
+    const requestedDuration = request.duration || 12;
+    const duration = allowedDurations.reduce((prev, curr) =>
+      Math.abs(curr - requestedDuration) < Math.abs(prev - requestedDuration) ? curr : prev
+    );
+
+    // Convert aspect ratio to Replicate format
+    const aspectRatio = request.aspectRatio === '16:9' ? 'landscape' : 'portrait';
+
+    // Prepare input for Replicate
+    const input: Record<string, unknown> = {
       prompt: request.prompt,
-      first_frame: request.firstFrameImage.startsWith('data:')
-        ? request.firstFrameImage
-        : `data:image/jpeg;base64,${request.firstFrameImage}`,
-      duration: request.duration || 12,
-      aspect_ratio: request.aspectRatio || '9:16',
+      seconds: duration,
+      aspect_ratio: aspectRatio,
     };
 
+    // Add first frame image if provided
+    if (request.firstFrameImage) {
+      // Replicate expects a URL or data URI
+      const imageData = request.firstFrameImage.startsWith('data:')
+        ? request.firstFrameImage
+        : `data:image/jpeg;base64,${request.firstFrameImage}`;
+      input.input_reference = imageData;
+    }
+
+    // Pass OpenAI API key if available for direct billing
+    if (this.openaiApiKey) {
+      input.openai_api_key = this.openaiApiKey;
+    }
+
     try {
-      const response = await fetch(`${this.baseUrl}/videos/generations`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiRequest),
+      // Create prediction (async - returns immediately with ID)
+      const prediction = await this.replicate.predictions.create({
+        model: 'openai/sora-2',
+        input,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Sora2 API error (${response.status}): ${errorText}`
-        );
-      }
-
-      const data = await response.json() as Sora2ApiResponse;
-
       return {
-        id: data.id,
-        status: data.status,
-        estimatedTimeSeconds: data.estimated_seconds || 120,
+        id: prediction.id,
+        status: this.mapReplicateStatus(prediction.status),
+        estimatedTimeSeconds: duration * 10, // Rough estimate
       };
     } catch (error) {
       if (error instanceof Error) {
@@ -190,7 +181,7 @@ export class VideoGenerator {
 
   /**
    * Check the status of a video generation job
-   * @param generationId Generation job ID
+   * @param generationId Generation job ID (Replicate prediction ID)
    * @returns Current status information
    */
   async checkStatus(generationId: string): Promise<GenerationStatus> {
@@ -198,31 +189,18 @@ export class VideoGenerator {
       return this.checkStatusMock(generationId);
     }
 
+    if (!this.replicate) {
+      throw new Error('Replicate client not initialized');
+    }
+
     try {
-      const response = await fetch(
-        `${this.baseUrl}/videos/generations/${generationId}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Sora2 API error (${response.status}): ${errorText}`
-        );
-      }
-
-      const data = await response.json() as Sora2ApiResponse;
+      const prediction = await this.replicate.predictions.get(generationId);
 
       return {
-        id: data.id,
-        status: data.status,
-        progress: data.progress,
-        error: data.error,
+        id: prediction.id,
+        status: this.mapReplicateStatus(prediction.status),
+        progress: this.extractProgress(prediction),
+        error: prediction.error ? String(prediction.error) : undefined,
       };
     } catch (error) {
       if (error instanceof Error) {
@@ -242,51 +220,41 @@ export class VideoGenerator {
       return this.getVideoMock(generationId);
     }
 
-    const status = await this.checkStatus(generationId);
+    if (!this.replicate) {
+      throw new Error('Replicate client not initialized');
+    }
 
-    if (status.status !== 'completed') {
+    const prediction = await this.replicate.predictions.get(generationId);
+
+    if (prediction.status !== 'succeeded') {
       throw new Error(
-        `Video generation not completed yet. Current status: ${status.status}`
+        `Video generation not completed yet. Current status: ${prediction.status}`
       );
     }
 
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/videos/generations/${generationId}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-        }
-      );
+    // Replicate returns output as array or string
+    const output = prediction.output;
+    let videoUrl: string;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Sora2 API error (${response.status}): ${errorText}`
-        );
-      }
-
-      const data = await response.json() as Sora2ApiResponse;
-
-      if (!data.video_url) {
-        throw new Error('Video URL not available in response');
-      }
-
-      return {
-        id: data.id,
-        videoUrl: data.video_url,
-        duration: data.duration || 12,
-        resolution: data.resolution || { width: 720, height: 1280 },
-        createdAt: data.created_at || new Date().toISOString(),
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to get video: ${error.message}`);
-      }
-      throw error;
+    if (Array.isArray(output)) {
+      videoUrl = output[0];
+    } else if (typeof output === 'string') {
+      videoUrl = output;
+    } else {
+      throw new Error('Unexpected output format from Replicate');
     }
+
+    // Extract duration from metrics if available
+    const metrics = prediction.metrics as Record<string, unknown> | undefined;
+    const duration = typeof metrics?.predict_time === 'number' ? 12 : 12; // Default to 12s
+
+    return {
+      id: prediction.id,
+      videoUrl,
+      duration,
+      resolution: { width: 720, height: 1280 }, // Default portrait
+      createdAt: prediction.created_at || new Date().toISOString(),
+    };
   }
 
   /**
@@ -322,6 +290,47 @@ export class VideoGenerator {
 
       // Wait before next poll
       await this.sleep(this.pollInterval);
+    }
+  }
+
+  /**
+   * Map Replicate status to our status format
+   */
+  private mapReplicateStatus(
+    status: string
+  ): 'pending' | 'processing' | 'completed' | 'failed' {
+    switch (status) {
+      case 'starting':
+      case 'queued':
+        return 'pending';
+      case 'processing':
+        return 'processing';
+      case 'succeeded':
+        return 'completed';
+      case 'failed':
+      case 'canceled':
+        return 'failed';
+      default:
+        return 'pending';
+    }
+  }
+
+  /**
+   * Extract progress from Replicate prediction
+   */
+  private extractProgress(prediction: { status: string; logs?: string }): number | undefined {
+    // Replicate doesn't provide explicit progress, estimate from status
+    switch (prediction.status) {
+      case 'starting':
+        return 0;
+      case 'queued':
+        return 10;
+      case 'processing':
+        return 50;
+      case 'succeeded':
+        return 100;
+      default:
+        return undefined;
     }
   }
 

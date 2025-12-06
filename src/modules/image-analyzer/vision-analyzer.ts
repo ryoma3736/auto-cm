@@ -1,6 +1,6 @@
 /**
  * Vision Analyzer Module
- * AI-powered cosmetics product image analysis using OpenAI Vision API and Claude Vision API
+ * AI-powered cosmetics product image analysis using Gemini, OpenAI Vision, and Claude Vision APIs
  *
  * This module analyzes cosmetic product images and extracts:
  * - Product type and name
@@ -12,6 +12,7 @@
 
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * Supported cosmetic product types
@@ -46,16 +47,22 @@ export interface ProductAnalysis {
 export interface VisionAnalyzerOptions {
   /** OpenAI API key */
   openaiApiKey?: string;
-  /** Claude API key (fallback) */
+  /** Claude API key */
   claudeApiKey?: string;
+  /** Google Gemini API key (preferred) */
+  geminiApiKey?: string;
   /** OpenAI model to use (default: gpt-4o) */
   openaiModel?: string;
   /** Claude model to use (default: claude-3-5-sonnet-20241022) */
   claudeModel?: string;
+  /** Gemini model to use (default: gemini-2.0-flash-exp) */
+  geminiModel?: string;
   /** Maximum retry attempts on failure */
   maxRetries?: number;
   /** Use Claude as primary provider instead of OpenAI */
   useClaudePrimary?: boolean;
+  /** Use Gemini as primary provider (overrides useClaudePrimary) */
+  useGeminiPrimary?: boolean;
   /** Use mock implementation (for testing) */
   useMock?: boolean;
 }
@@ -63,11 +70,13 @@ export interface VisionAnalyzerOptions {
 /**
  * Default configuration
  */
-const DEFAULT_OPTIONS: Required<Omit<VisionAnalyzerOptions, 'openaiApiKey' | 'claudeApiKey'>> = {
+const DEFAULT_OPTIONS: Required<Omit<VisionAnalyzerOptions, 'openaiApiKey' | 'claudeApiKey' | 'geminiApiKey'>> = {
   openaiModel: 'gpt-4o',
   claudeModel: 'claude-3-5-sonnet-20241022',
+  geminiModel: 'gemini-2.0-flash-exp',
   maxRetries: 3,
   useClaudePrimary: false,
+  useGeminiPrimary: true, // Gemini is now the default primary provider
   useMock: false,
 };
 
@@ -90,12 +99,13 @@ const ANALYSIS_PROMPT = `あなたは化粧品マーケティングの専門家�
 
 /**
  * Vision Analyzer for cosmetic product images
- * Supports OpenAI Vision API with Claude Vision API as fallback
+ * Supports Gemini Vision, OpenAI Vision, and Claude Vision APIs
  */
 export class VisionAnalyzer {
   private options: Required<VisionAnalyzerOptions>;
   private openai?: OpenAI;
   private claude?: Anthropic;
+  private gemini?: GoogleGenerativeAI;
   private useMock: boolean;
 
   constructor(options: VisionAnalyzerOptions = {}) {
@@ -106,6 +116,7 @@ export class VisionAnalyzer {
       ...DEFAULT_OPTIONS,
       openaiApiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
       claudeApiKey: options.claudeApiKey || process.env.ANTHROPIC_API_KEY,
+      geminiApiKey: options.geminiApiKey || process.env.GEMINI_API_KEY,
       useMock: this.useMock,
       ...options,
     } as Required<VisionAnalyzerOptions>;
@@ -113,6 +124,11 @@ export class VisionAnalyzer {
     // Skip API key validation in mock mode
     if (this.useMock) {
       return;
+    }
+
+    // Initialize Gemini client if API key is available (preferred)
+    if (this.options.geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(this.options.geminiApiKey);
     }
 
     // Initialize OpenAI client if API key is available
@@ -130,9 +146,9 @@ export class VisionAnalyzer {
     }
 
     // Validate that at least one provider is configured
-    if (!this.openai && !this.claude) {
+    if (!this.gemini && !this.openai && !this.claude) {
       throw new Error(
-        'VisionAnalyzer requires at least one API key (OPENAI_API_KEY or ANTHROPIC_API_KEY)'
+        'VisionAnalyzer requires at least one API key (GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY)'
       );
     }
   }
@@ -155,7 +171,24 @@ export class VisionAnalyzer {
     // Retry loop
     for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
       try {
-        // Determine primary and fallback providers
+        // Try Gemini first if available and preferred (default)
+        if (this.options.useGeminiPrimary && this.gemini) {
+          try {
+            return await this.analyzeWithGemini(imageBase64);
+          } catch (geminiError) {
+            lastError = geminiError instanceof Error ? geminiError : new Error(String(geminiError));
+            console.log(`Gemini Vision failed, trying fallback: ${lastError.message}`);
+            // Fallback to OpenAI or Claude
+            if (this.openai) {
+              return await this.analyzeWithOpenAI(imageBase64);
+            } else if (this.claude) {
+              return await this.analyzeWithClaude(imageBase64);
+            }
+            throw geminiError;
+          }
+        }
+
+        // Determine primary and fallback providers for non-Gemini mode
         const primaryProvider = this.options.useClaudePrimary ? 'claude' : 'openai';
         const fallbackProvider = this.options.useClaudePrimary ? 'openai' : 'claude';
 
@@ -290,6 +323,39 @@ export class VisionAnalyzer {
     }
 
     return this.parseAnalysisResponse(content.text);
+  }
+
+  /**
+   * Analyze image using Google Gemini Vision API
+   *
+   * @param imageBase64 - Base64-encoded image
+   * @returns ProductAnalysis
+   */
+  private async analyzeWithGemini(imageBase64: string): Promise<ProductAnalysis> {
+    if (!this.gemini) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    const model = this.gemini.getGenerativeModel({ model: this.options.geminiModel });
+
+    const response = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: imageBase64,
+        },
+      },
+      {
+        text: ANALYSIS_PROMPT + '\n\nJSON形式のみで返答してください。説明文は不要です。',
+      },
+    ]);
+
+    const content = response.response.text();
+    if (!content) {
+      throw new Error('No response content from Gemini Vision API');
+    }
+
+    return this.parseAnalysisResponse(content);
   }
 
   /**
