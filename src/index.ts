@@ -7,6 +7,7 @@
  * Powered by Miyabi - Autonomous AI Development Framework
  */
 
+import 'dotenv/config';
 import { Command } from 'commander';
 import { AdGenerationPipeline } from './pipeline/index.js';
 import * as fs from 'fs';
