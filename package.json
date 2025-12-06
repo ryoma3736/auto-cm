@@ -1,24 +1,36 @@
 {
   "name": "auto-cm",
   "version": "0.1.0",
-  "description": "Autonomous development powered by Agentic OS",
+  "description": "Sora2 Automatic Advertisement Generation System",
   "type": "module",
+  "bin": {
+    "auto-cm": "./dist/index.js"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "test": "vitest",
+    "test:run": "vitest run",
+    "test:pipeline": "vitest run tests/pipeline.test.ts",
     "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts",
+    "cli": "tsx src/index.ts"
   },
   "keywords": [
     "agentic-os",
-    "autonomous"
+    "autonomous",
+    "sora2",
+    "advertisement",
+    "ai",
+    "video-generation"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "axios": "^1.7.9",
+    "commander": "^14.0.2",
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
     "openai": "^4.77.3",

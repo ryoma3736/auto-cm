@@ -56,6 +56,8 @@ export interface VisionAnalyzerOptions {
   maxRetries?: number;
   /** Use Claude as primary provider instead of OpenAI */
   useClaudePrimary?: boolean;
+  /** Use mock implementation (for testing) */
+  useMock?: boolean;
 }
 
 /**
@@ -66,6 +68,7 @@ const DEFAULT_OPTIONS: Required<Omit<VisionAnalyzerOptions, 'openaiApiKey' | 'cl
   claudeModel: 'claude-3-5-sonnet-20241022',
   maxRetries: 3,
   useClaudePrimary: false,
+  useMock: false,
 };
 
 /**
@@ -93,15 +96,24 @@ export class VisionAnalyzer {
   private options: Required<VisionAnalyzerOptions>;
   private openai?: OpenAI;
   private claude?: Anthropic;
+  private useMock: boolean;
 
   constructor(options: VisionAnalyzerOptions = {}) {
+    this.useMock = options.useMock || false;
+
     // Merge with defaults
     this.options = {
       ...DEFAULT_OPTIONS,
       openaiApiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
       claudeApiKey: options.claudeApiKey || process.env.ANTHROPIC_API_KEY,
+      useMock: this.useMock,
       ...options,
     } as Required<VisionAnalyzerOptions>;
+
+    // Skip API key validation in mock mode
+    if (this.useMock) {
+      return;
+    }
 
     // Initialize OpenAI client if API key is available
     if (this.options.openaiApiKey) {
@@ -133,6 +145,11 @@ export class VisionAnalyzer {
    * @throws Error if analysis fails after all retries
    */
   async analyze(imageBase64: string): Promise<ProductAnalysis> {
+    // Return mock data if in mock mode
+    if (this.useMock) {
+      return this.analyzeMock(imageBase64);
+    }
+
     let lastError: Error | null = null;
 
     // Retry loop
@@ -332,6 +349,25 @@ export class VisionAnalyzer {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Mock implementation for testing
+   *
+   * @param _imageBase64 - Base64-encoded image (unused in mock)
+   * @returns Mock ProductAnalysis
+   */
+  private analyzeMock(_imageBase64: string): ProductAnalysis {
+    return {
+      productType: 'lipstick',
+      productName: 'Mock Coral Pink Lipstick',
+      colors: ['coral pink', 'nude beige'],
+      features: ['long-lasting', 'moisturizing', 'vibrant color'],
+      targetAudience: '20-30代の働く女性',
+      mood: ['elegant', 'modern', 'professional'],
+      brandStyle: 'High-quality modern cosmetics brand',
+      rawDescription: 'A beautiful coral pink lipstick with moisturizing properties, perfect for professional women in their 20s-30s.',
+    };
   }
 }
 

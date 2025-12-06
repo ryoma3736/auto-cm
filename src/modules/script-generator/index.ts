@@ -76,6 +76,8 @@ export interface ScriptGeneratorOptions {
   maxRetries?: number;
   /** Script duration in seconds (default: 12) */
   targetDuration?: number;
+  /** Use mock implementation (for testing) */
+  useMock?: boolean;
 }
 
 /**
@@ -85,6 +87,7 @@ const DEFAULT_OPTIONS: Required<Omit<ScriptGeneratorOptions, 'apiKey'>> = {
   model: 'gpt-4o',
   maxRetries: 3,
   targetDuration: 12,
+  useMock: false,
 };
 
 /**
@@ -160,15 +163,24 @@ const SCRIPT_GENERATION_PROMPT = `あなたはUGC広告のスクリプトライ�
  */
 export class ScriptGenerator {
   private options: Required<ScriptGeneratorOptions>;
-  private openai: OpenAI;
+  private openai?: OpenAI;
+  private useMock: boolean;
 
   constructor(options: ScriptGeneratorOptions = {}) {
+    this.useMock = options.useMock || false;
+
     // Merge with defaults
     this.options = {
       ...DEFAULT_OPTIONS,
       apiKey: options.apiKey || process.env.OPENAI_API_KEY,
+      useMock: this.useMock,
       ...options,
     } as Required<ScriptGeneratorOptions>;
+
+    // Skip API key validation in mock mode
+    if (this.useMock) {
+      return;
+    }
 
     // Validate API key
     if (!this.options.apiKey) {
@@ -189,6 +201,15 @@ export class ScriptGenerator {
    * @throws Error if generation fails after all retries
    */
   async generatePersona(analysis: ProductAnalysis): Promise<Persona> {
+    // Return mock data if in mock mode
+    if (this.useMock) {
+      return this.generatePersonaMock(analysis);
+    }
+
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
@@ -244,6 +265,15 @@ export class ScriptGenerator {
    * @throws Error if generation fails after all retries
    */
   async generateScript(persona: Persona, analysis: ProductAnalysis): Promise<UGCScript> {
+    // Return mock data if in mock mode
+    if (this.useMock) {
+      return this.generateScriptMock(persona, analysis);
+    }
+
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.options.maxRetries; attempt++) {
@@ -416,6 +446,77 @@ export class ScriptGenerator {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Mock persona generation for testing
+   *
+   * @param analysis - Product analysis
+   * @returns Mock persona
+   */
+  private generatePersonaMock(_analysis: ProductAnalysis): Persona {
+    return {
+      name: '美咲',
+      age: 28,
+      occupation: 'IT企業勤務（マーケティング担当）',
+      personality: ['明るい', '社交的', '美容好き'],
+      speakingStyle: '友達に話すようなカジュアルで親しみやすい口調',
+      painPoints: ['忙しくて時短コスメが欲しい', '自然な仕上がりを求めている'],
+      lifestyle: '仕事が忙しいが、美容には気を使いたい。週末はカフェ巡りが趣味。',
+    };
+  }
+
+  /**
+   * Mock script generation for testing
+   *
+   * @param _persona - Target persona
+   * @param _analysis - Product analysis
+   * @returns Mock UGC script
+   */
+  private generateScriptMock(_persona: Persona, _analysis: ProductAnalysis): UGCScript {
+    return {
+      totalDuration: 12,
+      scenes: [
+        {
+          sceneNumber: 1,
+          timeCode: '00:00-00:03',
+          durationSeconds: 3,
+          narration: 'ねぇねぇ、これ見て!最近買った新しいリップ!',
+          emotion: 'excited',
+          cameraDirection: 'close-up',
+          visualDescription: 'Young woman holding a coral pink lipstick, excited expression, bright lighting',
+        },
+        {
+          sceneNumber: 2,
+          timeCode: '00:03-00:07',
+          durationSeconds: 4,
+          narration: '色がめっちゃ綺麗でしょ?コーラルピンクで、肌なじみがすごくいいの',
+          emotion: 'confident',
+          cameraDirection: 'medium shot',
+          visualDescription: 'Close-up of the lipstick being applied, showing the coral pink color',
+        },
+        {
+          sceneNumber: 3,
+          timeCode: '00:07-00:10',
+          durationSeconds: 3,
+          narration: '保湿成分も入ってるから、一日中うるおうよ',
+          emotion: 'calm',
+          cameraDirection: 'close-up',
+          visualDescription: 'Woman smiling, showing the finished lip makeup, natural lighting',
+        },
+        {
+          sceneNumber: 4,
+          timeCode: '00:10-00:12',
+          durationSeconds: 2,
+          narration: 'これはマジでおすすめ!',
+          emotion: 'excited',
+          cameraDirection: 'medium shot',
+          visualDescription: 'Woman giving thumbs up, happy expression, product visible',
+        },
+      ],
+      sora2Prompt:
+        'A young professional woman in her late 20s creates a UGC-style video about a coral pink lipstick. The video starts with her excitedly holding the lipstick in close-up, then shows her applying it while explaining its beautiful color and skin-friendly properties. The video has natural, casual lighting and a friendly, authentic vibe. She concludes with a confident recommendation, giving a thumbs up. The entire video is shot in a modern, minimalist setting with soft, warm lighting.',
+    };
   }
 }
 

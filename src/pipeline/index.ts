@@ -1,111 +1,503 @@
 /**
  * Pipeline Module
- * Orchestrates the entire movie creation workflow
+ * Orchestrates the entire ad generation workflow
+ *
+ * Flow:
+ * 1. Image input & validation (ImageInputModule)
+ * 2. Base64 conversion (ImageInputModule.toBase64)
+ * 3. Vision API analysis (VisionAnalyzer.analyze)
+ * 4. Persona & script generation (ScriptGenerator.generateFullScript)
+ * 5. NanoBanana vertical extension (ImageProcessor.extendToVertical)
+ * 6. 720x1280 resize (ImageProcessor.resizeTo720x1280)
+ * 7. Sora2 video generation (VideoGenerator.generateAndWait)
+ * 8. Google Drive storage (DriveStorage.upload)
+ * 9. Result return
  */
 
-import { ImageAnalyzer } from '../modules/image-analyzer/index.js';
-import { ScriptGenerator } from '../modules/script-generator/index.js';
+import {
+  ImageInputModule,
+  VisionAnalyzer,
+  type ProductAnalysis,
+} from '../modules/image-analyzer/index.js';
+import {
+  ScriptGenerator,
+  type Persona,
+  type UGCScript,
+} from '../modules/script-generator/index.js';
 import { ImageProcessor } from '../modules/image-processor/index.js';
 import { VideoGenerator } from '../modules/video-generator/index.js';
-import { Storage } from '../modules/storage/index.js';
-import type { Config } from '../config/default.js';
+import { DriveStorage, type VideoFile } from '../modules/storage/index.js';
 
-export interface PipelineOptions {
-  config: Config;
-  uploadToGoogleDrive?: boolean;
+// ========== Pipeline Interfaces ==========
+
+export interface PipelineInput {
+  /** Local file path to product image */
+  imagePath?: string;
+  /** URL to product image */
+  imageUrl?: string;
+  /** Base64-encoded image (with or without data URI prefix) */
+  imageBase64?: string;
+  /** Google Drive folder ID for upload */
+  outputFolderId?: string;
+  /** Make uploaded video publicly accessible */
+  makePublic?: boolean;
 }
 
 export interface PipelineResult {
-  videoPath: string;
-  duration: number;
-  uploadResult?: {
-    fileId: string;
-    webViewLink: string;
+  /** Pipeline execution success status */
+  success: boolean;
+  /** Generated video URL (if successful) */
+  videoUrl?: string;
+  /** Google Drive link (if uploaded) */
+  driveLink?: string;
+  /** Detailed metadata about the generation process */
+  metadata: {
+    productAnalysis: ProductAnalysis;
+    persona: Persona;
+    script: UGCScript;
+    processingTime: number;
+    stages: StageResult[];
   };
+  /** Error message (if failed) */
+  error?: string;
 }
 
-export class MovieCreationPipeline {
-  private imageAnalyzer: ImageAnalyzer;
+export interface StageResult {
+  /** Stage name */
+  name: string;
+  /** Execution status */
+  status: 'success' | 'failed' | 'skipped';
+  /** Execution duration in milliseconds */
+  duration: number;
+  /** Error message (if failed) */
+  error?: string;
+}
+
+export interface PipelineOptions {
+  /** OpenAI API key (for Vision + Script generation) */
+  openaiApiKey?: string;
+  /** Google Drive credentials (object or path) */
+  googleDriveCredentials?: object;
+  googleDriveCredentialsPath?: string;
+  /** Use mock implementations (for testing) */
+  useMock?: boolean;
+  /** Enable verbose logging */
+  verbose?: boolean;
+}
+
+// ========== Main Pipeline Class ==========
+
+/**
+ * AdGenerationPipeline - Complete automation for UGC ad generation
+ *
+ * This class orchestrates all stages of the ad creation process:
+ * - Image analysis with AI vision
+ * - Script generation with persona
+ * - Image processing for video format
+ * - Video generation with Sora2
+ * - Cloud storage upload
+ */
+export class AdGenerationPipeline {
+  private imageInput: ImageInputModule;
+  private visionAnalyzer: VisionAnalyzer;
   private scriptGenerator: ScriptGenerator;
   private imageProcessor: ImageProcessor;
   private videoGenerator: VideoGenerator;
-  private storage: Storage;
+  private driveStorage: DriveStorage | null = null;
   private options: PipelineOptions;
 
-  constructor(options: PipelineOptions) {
-    this.options = options;
-    const { config } = options;
+  constructor(options: PipelineOptions = {}) {
+    this.options = {
+      useMock: false,
+      verbose: false,
+      ...options,
+    };
 
-    this.imageAnalyzer = new ImageAnalyzer({
-      apiKey: config.openai.apiKey,
-      model: config.openai.model,
+    // Initialize modules
+    this.imageInput = new ImageInputModule();
+
+    this.visionAnalyzer = new VisionAnalyzer({
+      openaiApiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
+      useMock: options.useMock,
     });
 
     this.scriptGenerator = new ScriptGenerator({
-      apiKey: config.openai.apiKey,
+      apiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
+      useMock: options.useMock,
     });
 
     this.imageProcessor = new ImageProcessor({
-      nanoBananaApiKey: config.nanoBanana.apiKey,
-      nanoBananaEndpoint: config.nanoBanana.endpoint,
+      nanoBananaApiKey: process.env.NANOBANANA_API_KEY || '',
+      nanoBananaEndpoint: process.env.NANOBANANA_ENDPOINT || '',
     });
 
     this.videoGenerator = new VideoGenerator({
-      apiKey: config.sora2.apiKey,
-      baseUrl: config.sora2.endpoint,
+      apiKey: process.env.SORA2_API_KEY || process.env.OPENAI_API_KEY,
+      useMock: options.useMock,
     });
 
-    this.storage = new Storage({
-      googleDriveCredentialsPath: config.googleDrive.credentialsPath,
-      outputDirectory: config.storage.outputDirectory,
-      tempDirectory: config.storage.tempDirectory,
-    });
+    // Initialize DriveStorage if credentials are provided
+    if (options.googleDriveCredentials || options.googleDriveCredentialsPath) {
+      this.driveStorage = new DriveStorage({
+        credentials: options.googleDriveCredentials,
+        credentialsPath: options.googleDriveCredentialsPath,
+        useMock: options.useMock,
+      });
+    }
   }
 
   /**
-   * Execute the complete movie creation pipeline
+   * Execute the complete ad generation pipeline
+   *
+   * @param input - Pipeline input (image path, URL, or base64)
+   * @returns Complete pipeline result with metadata
    */
-  async execute(_inputImages: string[]): Promise<PipelineResult> {
-    // TODO: Implement full pipeline
-    // 1. Analyze images
-    // 2. Generate script
-    // 3. Process images
-    // 4. Generate video
-    // 5. Upload to Google Drive (optional)
-    throw new Error('Not implemented yet');
+  async generate(input: PipelineInput): Promise<PipelineResult> {
+    const startTime = Date.now();
+    const stages: StageResult[] = [];
+
+    let productAnalysis: ProductAnalysis | null = null;
+    let persona: Persona | null = null;
+    let script: UGCScript | null = null;
+    let videoUrl: string | undefined;
+    let driveLink: string | undefined;
+
+    try {
+      // ============================================================
+      // Stage 1: Image Input & Validation
+      // ============================================================
+      const stage1 = await this.executeStage('Image Input & Validation', async () => {
+        this.log('Loading and validating image...');
+
+        let imageBase64: string;
+
+        if (input.imageBase64) {
+          // Remove data URI prefix if present
+          imageBase64 = input.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+          this.log('Using provided base64 image');
+        } else if (input.imagePath) {
+          const imageData = await this.imageInput.loadAndValidate(input.imagePath);
+          imageBase64 = this.imageInput.toBase64(imageData);
+          this.log(`Loaded image from path: ${input.imagePath}`);
+        } else if (input.imageUrl) {
+          const imageData = await this.imageInput.loadAndValidate(input.imageUrl);
+          imageBase64 = this.imageInput.toBase64(imageData);
+          this.log(`Loaded image from URL: ${input.imageUrl}`);
+        } else {
+          throw new Error('No image input provided (imagePath, imageUrl, or imageBase64 required)');
+        }
+
+        return { imageBase64 };
+      });
+      stages.push(stage1.stage);
+
+      if (!stage1.result) {
+        throw new Error('Stage 1 failed: No image data');
+      }
+
+      const { imageBase64 } = stage1.result;
+
+      // ============================================================
+      // Stage 2: Vision API Analysis
+      // ============================================================
+      const stage2 = await this.executeStage('Vision API Analysis', async () => {
+        this.log('Analyzing product image with AI vision...');
+        const analysis = await this.visionAnalyzer.analyze(imageBase64);
+        this.log(`Product type: ${analysis.productType}, Name: ${analysis.productName}`);
+        return { analysis };
+      });
+      stages.push(stage2.stage);
+
+      if (!stage2.result) {
+        throw new Error('Stage 2 failed: No vision analysis');
+      }
+
+      productAnalysis = stage2.result.analysis;
+
+      // ============================================================
+      // Stage 3: Persona & Script Generation
+      // ============================================================
+      const stage3 = await this.executeStage('Persona & Script Generation', async () => {
+        this.log('Generating target persona and UGC script...');
+        const { persona: generatedPersona, script: generatedScript } =
+          await this.scriptGenerator.generateFullScript(productAnalysis!);
+        this.log(`Persona: ${generatedPersona.name}, ${generatedPersona.age} years old`);
+        this.log(`Script scenes: ${generatedScript.scenes.length}`);
+        return { persona: generatedPersona, script: generatedScript };
+      });
+      stages.push(stage3.stage);
+
+      if (!stage3.result) {
+        throw new Error('Stage 3 failed: No persona/script');
+      }
+
+      persona = stage3.result.persona;
+      script = stage3.result.script;
+
+      // ============================================================
+      // Stage 4: Image Extension to Vertical (9:16)
+      // ============================================================
+      const stage4 = await this.executeStage('Image Extension to Vertical', async () => {
+        this.log('Extending image to 9:16 aspect ratio...');
+        const extended = await this.imageProcessor.extendToVertical(imageBase64, {
+          targetAspectRatio: '9:16',
+          backgroundColor: '#FFFFFF',
+          preserveOriginal: true,
+        });
+        this.log(`Extended to ${extended.width}x${extended.height}`);
+        return { extendedBase64: extended.base64 };
+      });
+      stages.push(stage4.stage);
+
+      if (!stage4.result) {
+        throw new Error('Stage 4 failed: Image extension failed');
+      }
+
+      const { extendedBase64 } = stage4.result;
+
+      // ============================================================
+      // Stage 5: Resize to 720x1280 (Sora2 format)
+      // ============================================================
+      const stage5 = await this.executeStage('Resize to 720x1280', async () => {
+        this.log('Resizing to Sora2-compatible dimensions (720x1280)...');
+        const resized = await this.imageProcessor.resizeTo720x1280(extendedBase64);
+        this.log(`Resized: ${resized.width}x${resized.height}, ${resized.format}`);
+        return { resizedBase64: resized.base64 };
+      });
+      stages.push(stage5.stage);
+
+      if (!stage5.result) {
+        throw new Error('Stage 5 failed: Image resize failed');
+      }
+
+      const { resizedBase64 } = stage5.result;
+
+      // ============================================================
+      // Stage 6: Sora2 Video Generation
+      // ============================================================
+      const stage6 = await this.executeStage('Sora2 Video Generation', async () => {
+        this.log('Generating video with Sora2...');
+        this.log(`Prompt: ${script!.sora2Prompt.substring(0, 100)}...`);
+
+        const videoResult = await this.videoGenerator.generateAndWait({
+          firstFrameImage: resizedBase64,
+          prompt: script!.sora2Prompt,
+          duration: 12,
+          aspectRatio: '9:16',
+        });
+
+        this.log(`Video generated: ${videoResult.videoUrl}`);
+        return { videoResult };
+      });
+      stages.push(stage6.stage);
+
+      if (!stage6.result) {
+        throw new Error('Stage 6 failed: Video generation failed');
+      }
+
+      videoUrl = stage6.result.videoResult.videoUrl;
+
+      // ============================================================
+      // Stage 7: Google Drive Upload (Optional)
+      // ============================================================
+      if (this.driveStorage) {
+        const stage7 = await this.executeStage('Google Drive Upload', async () => {
+          this.log('Uploading to Google Drive...');
+
+          if (!this.driveStorage) {
+            throw new Error('DriveStorage not initialized');
+          }
+
+          // Authenticate if not already done
+          await this.driveStorage.authenticate();
+
+          // Create monthly folder if requested
+          const folderId = input.outputFolderId || await this.driveStorage.createMonthlyFolder();
+
+          // Generate filename
+          const filename = DriveStorage.generateFilename(productAnalysis!.productType);
+
+          // For mock mode, create a fake video buffer
+          const videoBuffer = this.options.useMock
+            ? Buffer.from('mock-video-data')
+            : Buffer.from(await this.fetchVideoBuffer(videoUrl!));
+
+          const videoFile: VideoFile = {
+            buffer: videoBuffer,
+            filename,
+            mimeType: 'video/mp4',
+          };
+
+          const uploadResult = await this.driveStorage.upload(videoFile, {
+            folderId,
+            makePublic: input.makePublic ?? true,
+            description: `Auto-generated UGC ad for ${productAnalysis!.productName}`,
+          });
+
+          this.log(`Uploaded to Drive: ${uploadResult.webViewLink}`);
+          return { driveFile: uploadResult };
+        });
+        stages.push(stage7.stage);
+
+        if (stage7.result) {
+          driveLink = stage7.result.driveFile.webViewLink;
+        }
+      } else {
+        stages.push({
+          name: 'Google Drive Upload',
+          status: 'skipped',
+          duration: 0,
+        });
+        this.log('Google Drive upload skipped (no credentials provided)');
+      }
+
+      // ============================================================
+      // Success - Return Complete Result
+      // ============================================================
+      const processingTime = Date.now() - startTime;
+
+      return {
+        success: true,
+        videoUrl,
+        driveLink,
+        metadata: {
+          productAnalysis: productAnalysis!,
+          persona: persona!,
+          script: script!,
+          processingTime,
+          stages,
+        },
+      };
+    } catch (error) {
+      // ============================================================
+      // Error Handling - Partial Result
+      // ============================================================
+      const processingTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      this.log(`Pipeline failed: ${errorMessage}`, 'error');
+
+      return {
+        success: false,
+        error: errorMessage,
+        metadata: {
+          productAnalysis: productAnalysis || {
+            productType: 'other',
+            productName: 'Unknown',
+            colors: [],
+            features: [],
+            targetAudience: 'Unknown',
+            mood: [],
+            brandStyle: 'Unknown',
+            rawDescription: '',
+          },
+          persona: persona || {
+            name: 'Unknown',
+            age: 0,
+            occupation: 'Unknown',
+            personality: [],
+            speakingStyle: 'Unknown',
+            painPoints: [],
+            lifestyle: 'Unknown',
+          },
+          script: script || {
+            totalDuration: 12,
+            scenes: [],
+            sora2Prompt: '',
+          },
+          processingTime,
+          stages,
+        },
+      };
+    }
   }
 
   /**
-   * Execute individual pipeline steps
+   * Execute a single pipeline stage with timing and error handling
    */
-  async analyzeImages(imagePaths: string[]) {
-    return this.imageAnalyzer.analyzeImages(imagePaths);
+  private async executeStage<T>(
+    name: string,
+    fn: () => Promise<T>
+  ): Promise<{ stage: StageResult; result: T | null }> {
+    const startTime = Date.now();
+
+    try {
+      const result = await fn();
+      const duration = Date.now() - startTime;
+
+      return {
+        stage: {
+          name,
+          status: 'success',
+          duration,
+        },
+        result,
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      return {
+        stage: {
+          name,
+          status: 'failed',
+          duration,
+          error: errorMessage,
+        },
+        result: null,
+      };
+    }
   }
 
   /**
-   * Generate UGC script from product analysis
-   * @param analysis - Product analysis result
-   * @returns Generated persona and script
+   * Fetch video buffer from URL (for real API mode)
    */
-  async generateScript(analysis: import('../modules/image-analyzer/vision-analyzer.js').ProductAnalysis) {
-    return this.scriptGenerator.generateFullScript(analysis);
-  }
-
-  async processImages(_imagePaths: string[]) {
-    // TODO: Implement image processing step
-    throw new Error('Not implemented yet');
+  private async fetchVideoBuffer(url: string): Promise<ArrayBuffer> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
+    }
+    return await response.arrayBuffer();
   }
 
   /**
-   * Generate video using the new VideoGenerator API
-   * @param firstFrameImage - Base64 encoded first frame
-   * @param prompt - Video generation prompt
-   * @returns Video generation result
+   * Log helper with optional verbose mode
    */
-  async generateVideo(firstFrameImage: string, prompt: string) {
-    return this.videoGenerator.generateAndWait({
-      firstFrameImage,
-      prompt,
-    });
+  private log(message: string, level: 'info' | 'error' = 'info'): void {
+    if (!this.options.verbose && level !== 'error') {
+      return;
+    }
+
+    const prefix = level === 'error' ? '❌' : '📋';
+    console.log(`${prefix} [Pipeline] ${message}`);
+  }
+}
+
+/**
+ * Factory function to create pipeline instance
+ */
+export function createPipeline(options?: PipelineOptions): AdGenerationPipeline {
+  return new AdGenerationPipeline(options);
+}
+
+// ========== Legacy Exports for Backward Compatibility ==========
+
+export type { Config } from '../config/default.js';
+export { ImageAnalyzer } from '../modules/image-analyzer/index.js';
+export { ScriptGenerator } from '../modules/script-generator/index.js';
+export { ImageProcessor } from '../modules/image-processor/index.js';
+export { VideoGenerator } from '../modules/video-generator/index.js';
+export { Storage } from '../modules/storage/index.js';
+
+/**
+ * Legacy MovieCreationPipeline (deprecated - use AdGenerationPipeline)
+ */
+export class MovieCreationPipeline {
+  constructor(_options: { config: any }) {
+    console.warn('MovieCreationPipeline is deprecated. Use AdGenerationPipeline instead.');
+  }
+
+  async execute(_inputImages: string[]): Promise<any> {
+    throw new Error('MovieCreationPipeline.execute() is deprecated. Use AdGenerationPipeline.generate() instead.');
   }
 }
