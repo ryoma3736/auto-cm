@@ -146,6 +146,34 @@ function generateCameraMovements(duration: number): string[] {
 }
 
 /**
+ * Build detailed product visual description for accurate AI generation
+ */
+function buildProductVisualDescription(productAnalysis: ProductAnalysis): string {
+  const visualDetails = productAnalysis.visualDetails;
+
+  if (!visualDetails) {
+    // Fallback to basic description if visual details not available
+    const productColors = productAnalysis.colors.join(', ');
+    return `The product features ${productColors} colors.`;
+  }
+
+  // Build detailed visual description (Issue #22)
+  const secondaryColorText = visualDetails.secondaryColors && visualDetails.secondaryColors.length > 0
+    ? ` with ${visualDetails.secondaryColors.join(', ')} accents`
+    : '';
+
+  return `The exact product is a ${visualDetails.shape} with:
+- Primary color: ${visualDetails.primaryColor}${secondaryColorText}
+- Brand text "${visualDetails.brandLogoText}" visible on ${visualDetails.brandLogoPosition}
+- ${visualDetails.packageStyle} design
+- ${visualDetails.materialAppearance} finish
+- Size: approximately ${visualDetails.estimatedSize}
+
+CRITICAL: The product MUST match this description exactly.
+Do NOT substitute with a different product.`;
+}
+
+/**
  * Build main Sora2 prompt
  */
 function buildMainPrompt(params: {
@@ -162,8 +190,16 @@ function buildMainPrompt(params: {
   const productMood = productAnalysis.mood.join(', ');
   const cameraDesc = cameraMovements.join('. ');
 
-  // Build a cinematic prompt
-  const prompt = `Cinematic commercial video. ${personDescription} A professional presenter showcasing ${productAnalysis.productName} (${productAnalysis.productType}). The product features ${productColors} colors with a ${productMood} aesthetic. ${productAnalysis.brandStyle} style. The person holds and presents the product naturally, making eye contact with the camera. Smooth camera movements: ${cameraDesc}. Professional studio lighting with soft shadows. High-end advertisement quality. 4K, shallow depth of field.`;
+  // Build detailed product visual description (Issue #22)
+  const productVisualDesc = buildProductVisualDescription(productAnalysis);
+
+  // Build a cinematic prompt with product visual details
+  const prompt = `Cinematic commercial video. ${personDescription} A professional presenter showcasing ${productAnalysis.productName} (${productAnalysis.productType}).
+
+PRODUCT VISUAL DETAILS:
+${productVisualDesc}
+
+STYLE: The product features ${productColors} colors with a ${productMood} aesthetic. ${productAnalysis.brandStyle} style. The person holds and presents the product naturally, making eye contact with the camera. Smooth camera movements: ${cameraDesc}. Professional studio lighting with soft shadows. High-end advertisement quality. 4K, shallow depth of field.`;
 
   return prompt;
 }

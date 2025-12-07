@@ -57,5 +57,6 @@ export {
   createVisionAnalyzer,
   type ProductAnalysis,
   type ProductType,
+  type ProductVisualDetails,
   type VisionAnalyzerOptions,
 } from './vision-analyzer.js';
