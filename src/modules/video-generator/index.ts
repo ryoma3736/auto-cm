@@ -517,3 +517,12 @@ export function createVideoGenerator(
 ): VideoGenerator {
   return new VideoGenerator(options);
 }
+
+// Re-export person prompt utilities
+export {
+  generatePersonPrompt,
+  mergeWithScriptPrompt,
+  createCompositePrompt,
+  type PersonVideoRequest,
+  type EnhancedPromptResult,
+} from './person-prompt.js';
