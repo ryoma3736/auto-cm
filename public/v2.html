@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-CM V2 - 人物起用CM生成</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 700px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { text-align: center; margin-bottom: 10px; font-size: 2em; }
+    .subtitle { text-align: center; color: #666; margin-bottom: 10px; }
+    .v2-badge-header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    .v2-badge-big {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 5px 15px;
+      border-radius: 15px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Auto Mode Indicator */
+    .auto-mode {
+      background: #e8f5e9;
+      border: 2px solid #4caf50;
+      border-radius: 10px;
+      padding: 12px 15px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .auto-icon {
+      font-size: 24px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .auto-text {
+      flex: 1;
+    }
+    .auto-text strong {
+      display: block;
+      color: #2e7d32;
+      font-size: 14px;
+    }
+    .auto-text span {
+      font-size: 12px;
+      color: #666;
+    }
+    .auto-status {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: #4caf50;
+      color: white;
+    }
+
+    /* Upload Grid */
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .upload-box {
+      border: 3px dashed #ddd;
+      border-radius: 15px;
+      padding: 25px 15px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .upload-box:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    .upload-box.has-file {
+      border-color: #4caf50;
+      border-style: solid;
+      background: #e8f5e9;
+    }
+    .upload-box.primary {
+      grid-column: 1 / -1;
+      padding: 40px 15px;
+    }
+    .upload-box .icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+    }
+    .upload-box.primary .icon {
+      font-size: 56px;
+    }
+    .upload-box .label {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .upload-box .hint {
+      font-size: 11px;
+      color: #999;
+    }
+    .upload-box .filename {
+      font-size: 12px;
+      color: #4caf50;
+      margin-top: 8px;
+      word-break: break-all;
+    }
+    .upload-box .preview-img {
+      max-width: 100%;
+      max-height: 120px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .upload-box .check-icon {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #4caf50;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .upload-box.has-file .check-icon {
+      display: flex;
+    }
+    .upload-box .required-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #f44336;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 10px;
+    }
+    .upload-box .optional-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #9e9e9e;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 10px;
+    }
+
+    /* Settings */
+    .settings {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .setting-group {
+      flex: 1;
+    }
+    .setting-group label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    .setting-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+    .setting-group select:hover, .setting-group select:focus {
+      border-color: #667eea;
+      outline: none;
+    }
+
+    /* Comparison Grid for All Engines */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+    }
+    @media (max-width: 600px) {
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .engine-result-card {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border: 2px solid #e0e0e0;
+      transition: all 0.3s;
+    }
+    .engine-result-card.success {
+      border-color: #4caf50;
+    }
+    .engine-result-card.failed {
+      border-color: #f44336;
+      opacity: 0.7;
+    }
+    .engine-result-card.recommended {
+      border-color: #ffd700;
+      box-shadow: 0 4px 16px rgba(255,215,0,0.3);
+    }
+    .engine-result-card h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .engine-result-card .time-badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      margin-left: auto;
+    }
+    .engine-result-card video {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .engine-result-card .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .engine-result-card .actions button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .engine-result-card .actions .btn-select {
+      background: #667eea;
+      color: white;
+    }
+    .engine-result-card .actions .btn-select:hover {
+      background: #5a6fd6;
+    }
+    .engine-result-card .actions .btn-download {
+      background: #4caf50;
+      color: white;
+    }
+
+    /* Feature Summary */
+    .feature-summary {
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .feature-summary h4 {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .feature-list {
+      display: flex;
+      gap: 15px;
+    }
+    .feature-item {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+      border: 2px solid #e0e0e0;
+      transition: all 0.3s;
+    }
+    .feature-item.active {
+      border-color: #4caf50;
+      background: #e8f5e9;
+    }
+    .feature-item .f-icon {
+      font-size: 20px;
+    }
+    .feature-item .f-text {
+      font-size: 12px;
+      color: #666;
+    }
+    .feature-item.active .f-text {
+      color: #2e7d32;
+      font-weight: 600;
+    }
+
+    /* Button */
+    .btn {
+      width: 100%;
+      padding: 18px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      color: white;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102,126,234,0.4);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Progress & Result */
+    .progress {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      display: none;
+    }
+    .progress.show { display: block; }
+    .progress-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .progress-item:last-child { border-bottom: none; }
+    .progress-icon { margin-right: 10px; font-size: 18px; }
+
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      background: #d4edda;
+      border-radius: 10px;
+      display: none;
+    }
+    .result.show { display: block; }
+    .result.error { background: #f8d7da; }
+    .result h3 { margin-bottom: 10px; }
+    .result a { color: #667eea; word-break: break-all; }
+    .result p { margin-bottom: 8px; }
+
+    .video-url-container {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .video-url-container a {
+      display: block;
+      font-size: 13px;
+      word-break: break-all;
+    }
+    .video-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .video-actions button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .btn-copy { background: #667eea; color: white; }
+    .btn-open { background: #28a745; color: white; }
+    .btn-copy:hover, .btn-open:hover { opacity: 0.9; }
+    .mock-badge {
+      background: #ffc107;
+      color: #000;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+
+    .v2-profile {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f0f2ff;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+
+    /* Back link */
+    .back-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .back-link a {
+      color: #667eea;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+
+    /* Hidden inputs */
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Auto-CM V2</h1>
+    <p class="subtitle">人物起用 & ボイスクローン対応</p>
+    <div class="v2-badge-header">
+      <span class="v2-badge-big">V2 人物起用CM生成</span>
+    </div>
+
+    <!-- Auto Mode Indicator -->
+    <div class="auto-mode">
+      <span class="auto-icon">🔄</span>
+      <div class="auto-text">
+        <strong>オートモード ON</strong>
+        <span id="auto-description">アップロードに応じて自動で機能を有効化</span>
+      </div>
+      <span class="auto-status" id="auto-status">待機中</span>
+    </div>
+
+    <!-- Upload Grid -->
+    <div class="upload-grid">
+      <div class="upload-box primary" id="product-box">
+        <span class="required-badge">必須</span>
+        <span class="check-icon">✓</span>
+        <div class="icon">📸</div>
+        <div class="label">商品画像</div>
+        <div class="hint">PNG, JPG (最大10MB)</div>
+        <div class="filename" id="product-filename"></div>
+        <img class="preview-img" id="product-preview" style="display:none;">
+      </div>
+      <div class="upload-box" id="person-box">
+        <span class="optional-badge">任意</span>
+        <span class="check-icon">✓</span>
+        <div class="icon">👤</div>
+        <div class="label">人物画像</div>
+        <div class="hint">アップロードで合成モードON</div>
+        <div class="composite-badge" id="composite-badge" style="display:none; margin-top:5px; background:#4caf50; color:white; padding:3px 8px; border-radius:5px; font-size:11px;">🎨 AI合成モード</div>
+        <div class="filename" id="person-filename"></div>
+        <img class="preview-img" id="person-preview" style="display:none;">
+      </div>
+      <div class="upload-box" id="voice-box">
+        <span class="optional-badge">任意</span>
+        <span class="check-icon">✓</span>
+        <div class="icon">🎤</div>
+        <div class="label">音声サンプル</div>
+        <div class="hint">ボイスクローン用</div>
+        <div class="filename" id="voice-filename"></div>
+      </div>
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="product-input" accept="image/png,image/jpeg">
+    <input type="file" id="person-input" accept="image/png,image/jpeg">
+    <input type="file" id="voice-input" accept="audio/mp3,audio/wav,audio/m4a,audio/*">
+
+    <!-- Settings -->
+    <div class="settings">
+      <div class="setting-group">
+        <label>🎬 動画エンジン</label>
+        <select id="engine-select">
+          <option value="heygen" selected>HeyGen（リップシンク）</option>
+          <option value="kling">Kling（モーション）</option>
+          <option value="seedance">Seedance（シネマティック）</option>
+          <option value="veo3">Veo3（音声付き・Google）</option>
+          <option value="all">🚀 全エンジン一括生成（A/B比較）</option>
+          <option value="both">両方生成（HeyGen+Kling）</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label>⏱️ 動画時間</label>
+        <select id="duration-select">
+          <option value="5" selected>5秒</option>
+          <option value="10">10秒</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label>🌐 言語</label>
+        <select id="language-select">
+          <option value="ja" selected>日本語</option>
+          <option value="en">English</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Engine Descriptions - All Engines -->
+    <div class="engine-descriptions" style="display: grid; gap: 8px; margin-bottom: 20px;">
+      <div class="engine-desc-item" data-engine="heygen" style="background: #f0f2ff; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #667eea; cursor: pointer; transition: all 0.2s;">
+        <strong>🎤 HeyGen:</strong> 人が話すリップシンク動画<br>
+        <span style="color:#666;font-size:12px;">→ インフルエンサー風PR、商品レビュー、説明動画向け</span>
+      </div>
+      <div class="engine-desc-item" data-engine="kling" style="background: #fff8f0; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #f5a623; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
+        <strong>🎬 Kling:</strong> 商品が動くモーション動画<br>
+        <span style="color:#666;font-size:12px;">→ 商品PV、ブランドCM、SNS広告向け</span>
+      </div>
+      <div class="engine-desc-item" data-engine="seedance" style="background: #f0fff4; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #38a169; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
+        <strong>🎥 Seedance:</strong> 映画風シネマティック動画<br>
+        <span style="color:#666;font-size:12px;">→ 高品質ブランドCM、プレミアム商品紹介、ティザー動画向け</span>
+      </div>
+      <div class="engine-desc-item" data-engine="veo3" style="background: #e8f4f8; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #4285f4; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
+        <strong>🔊 Veo3:</strong> 音声付きシネマティック動画（Google）<br>
+        <span style="color:#666;font-size:12px;">→ 会話・効果音付き動画、高品質ナレーション、没入型コンテンツ向け</span>
+      </div>
+      <div class="engine-desc-item" data-engine="all" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); border-radius: 8px; padding: 10px 12px; border-left: 4px solid #ff6b6b; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
+        <strong>🚀 全エンジン一括:</strong> 4エンジン同時生成でA/B比較<br>
+        <span style="color:#666;font-size:12px;">→ 最適なエンジン選定、マーケティングテスト用</span>
+      </div>
+      <div class="engine-desc-item" data-engine="both" style="background: #fff0f5; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #d53f8c; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
+        <strong>⚡ 両方生成:</strong> HeyGen + Kling 同時生成<br>
+        <span style="color:#666;font-size:12px;">→ リップシンク vs モーション比較</span>
+      </div>
+    </div>
+
+    <!-- Feature Summary -->
+    <div class="feature-summary">
+      <h4>有効な機能（オート検出）</h4>
+      <div class="feature-list">
+        <div class="feature-item" id="feat-basic">
+          <span class="f-icon">📸</span>
+          <span class="f-text">商品分析</span>
+        </div>
+        <div class="feature-item" id="feat-person">
+          <span class="f-icon">👤</span>
+          <span class="f-text">人物起用</span>
+        </div>
+        <div class="feature-item" id="feat-voice">
+          <span class="f-icon">🎤</span>
+          <span class="f-text">ボイスクローン</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="generate-btn" disabled>🚀 V2 CM動画を生成</button>
+
+    <div class="progress" id="progress">
+      <div class="progress-item" data-stage="load"><span class="progress-icon">⏳</span><span>ファイル読み込み中...</span></div>
+      <div class="progress-item" data-stage="analyze"><span class="progress-icon">⏳</span><span>商品・人物分析中...</span></div>
+      <div class="progress-item" data-stage="script"><span class="progress-icon">⏳</span><span>スクリプト生成中...</span></div>
+      <div class="progress-item" data-stage="voice"><span class="progress-icon">⏳</span><span>音声生成中...</span></div>
+      <div class="progress-item" data-stage="video"><span class="progress-icon">⏳</span><span>動画生成中...</span></div>
+    </div>
+
+    <div class="result" id="result">
+      <h3>✅ 生成完了！</h3>
+      <div id="result-content"></div>
+    </div>
+
+    <div class="back-link">
+      <a href="/">← V1シンプルモードに戻る</a>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const productBox = document.getElementById('product-box');
+    const personBox = document.getElementById('person-box');
+    const voiceBox = document.getElementById('voice-box');
+    const productInput = document.getElementById('product-input');
+    const personInput = document.getElementById('person-input');
+    const voiceInput = document.getElementById('voice-input');
+    const productFilename = document.getElementById('product-filename');
+    const personFilename = document.getElementById('person-filename');
+    const voiceFilename = document.getElementById('voice-filename');
+    const productPreview = document.getElementById('product-preview');
+    const personPreview = document.getElementById('person-preview');
+    const generateBtn = document.getElementById('generate-btn');
+    const progress = document.getElementById('progress');
+    const result = document.getElementById('result');
+    const resultContent = document.getElementById('result-content');
+    const durationSelect = document.getElementById('duration-select');
+    const languageSelect = document.getElementById('language-select');
+    const engineSelect = document.getElementById('engine-select');
+    const autoStatus = document.getElementById('auto-status');
+    const autoDescription = document.getElementById('auto-description');
+    const featBasic = document.getElementById('feat-basic');
+    const featPerson = document.getElementById('feat-person');
+    const featVoice = document.getElementById('feat-voice');
+
+    // File storage
+    let productFile = null;
+    let personFile = null;
+    let voiceFile = null;
+
+    // Engine card selection
+    const engineCards = document.querySelectorAll('.engine-desc-item');
+
+    function updateEngineSelection(selectedEngine) {
+      engineCards.forEach(card => {
+        if (card.dataset.engine === selectedEngine) {
+          card.style.opacity = '1';
+          card.style.transform = 'scale(1.02)';
+          card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        } else {
+          card.style.opacity = '0.6';
+          card.style.transform = 'scale(1)';
+          card.style.boxShadow = 'none';
+        }
+      });
+    }
+
+    // Click on card to select engine
+    engineCards.forEach(card => {
+      card.addEventListener('click', () => {
+        engineSelect.value = card.dataset.engine;
+        updateEngineSelection(card.dataset.engine);
+      });
+    });
+
+    // Sync with dropdown
+    engineSelect.addEventListener('change', () => {
+      updateEngineSelection(engineSelect.value);
+    });
+
+    // Initial selection
+    updateEngineSelection(engineSelect.value);
+
+    // Update auto mode status
+    function updateAutoMode() {
+      const hasProduct = !!productFile;
+      const hasPerson = !!personFile;
+      const hasVoice = !!voiceFile;
+
+      // Update feature indicators
+      featBasic.classList.toggle('active', hasProduct);
+      featPerson.classList.toggle('active', hasPerson);
+      featVoice.classList.toggle('active', hasVoice);
+
+      // Update auto status
+      if (!hasProduct) {
+        autoStatus.textContent = '待機中';
+        autoStatus.style.background = '#9e9e9e';
+        autoDescription.textContent = '商品画像をアップロードしてください';
+      } else if (hasPerson && hasVoice) {
+        autoStatus.textContent = 'フル機能';
+        autoStatus.style.background = '#4caf50';
+        autoDescription.textContent = '人物起用 + ボイスクローン有効';
+      } else if (hasPerson) {
+        autoStatus.textContent = '人物起用';
+        autoStatus.style.background = '#2196f3';
+        autoDescription.textContent = '人物分析を自動実行します';
+      } else if (hasVoice) {
+        autoStatus.textContent = 'ボイスクローン';
+        autoStatus.style.background = '#9c27b0';
+        autoDescription.textContent = '音声サンプルからボイスを生成';
+      } else {
+        autoStatus.textContent = 'V1相当';
+        autoStatus.style.background = '#ff9800';
+        autoDescription.textContent = '商品画像のみで基本CM生成';
+      }
+
+      // Enable/disable generate button
+      generateBtn.disabled = !hasProduct;
+    }
+
+    // File upload handlers
+    function setupUpload(box, input, filenameEl, previewEl, fileSetter, accept) {
+      box.addEventListener('click', () => input.click());
+      box.addEventListener('dragover', (e) => { e.preventDefault(); box.style.borderColor = '#667eea'; });
+      box.addEventListener('dragleave', () => { if (!box.classList.contains('has-file')) box.style.borderColor = '#ddd'; });
+      box.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0], box, filenameEl, previewEl, fileSetter, accept);
+      });
+      input.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleUpload(e.target.files[0], box, filenameEl, previewEl, fileSetter, accept);
+      });
+    }
+
+    function handleUpload(file, box, filenameEl, previewEl, fileSetter, accept) {
+      // Validate file type
+      if (accept.includes('image') && !file.type.match(/image\/(png|jpeg|jpg)/)) {
+        alert('PNG または JPG 画像を選択してください');
+        return;
+      }
+      if (accept.includes('audio') && !file.type.match(/audio\/.*/)) {
+        alert('音声ファイルを選択してください');
+        return;
+      }
+
+      fileSetter(file);
+      filenameEl.textContent = file.name;
+      box.classList.add('has-file');
+
+      // Show preview for images
+      if (previewEl && file.type.match(/image\/.*/)) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          previewEl.src = e.target.result;
+          previewEl.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+
+      updateAutoMode();
+    }
+
+    // Setup all upload handlers
+    const compositeBadge = document.getElementById('composite-badge');
+    setupUpload(productBox, productInput, productFilename, productPreview, (f) => { productFile = f; }, 'image');
+    setupUpload(personBox, personInput, personFilename, personPreview, (f) => {
+      personFile = f;
+      // Show composite badge when person image is uploaded
+      if (f) {
+        compositeBadge.style.display = 'inline-block';
+      } else {
+        compositeBadge.style.display = 'none';
+      }
+    }, 'image');
+    setupUpload(voiceBox, voiceInput, voiceFilename, null, (f) => { voiceFile = f; }, 'audio');
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => alert('URLをコピーしました！'));
+    }
+
+    // Generate
+    generateBtn.addEventListener('click', async () => {
+      if (!productFile) return;
+
+      generateBtn.disabled = true;
+      progress.classList.add('show');
+      result.classList.remove('show');
+
+      document.querySelectorAll('.progress-item').forEach(item => {
+        item.querySelector('.progress-icon').textContent = '⏳';
+      });
+
+      const formData = new FormData();
+      formData.append('image', productFile);
+      formData.append('duration', durationSelect.value);
+      formData.append('language', languageSelect.value);
+      formData.append('videoEngine', engineSelect.value);
+
+      // V2: Auto-add person and voice if available
+      if (personFile) formData.append('personImage', personFile);
+      if (voiceFile) formData.append('voiceSample', voiceFile);
+
+      try {
+        const response = await fetch('/api/generate-v2', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (data.success) {
+          document.querySelectorAll('.progress-item').forEach(item => {
+            item.querySelector('.progress-icon').textContent = '✅';
+          });
+
+          result.classList.remove('error');
+          result.classList.add('show');
+
+          const meta = data.metadata || {};
+          const productType = meta.productAnalysis?.productType || 'N/A';
+          const personaName = meta.persona?.name || 'N/A';
+          const personaAge = meta.persona?.age || '';
+          const sceneCount = meta.script?.scenes?.length || 0;
+          const procTime = ((meta.processingTime || 0) / 1000).toFixed(1);
+          const videoUrl = data.videoUrl || '';
+          const isMock = videoUrl.includes('mock');
+          const duration = durationSelect.value;
+          const langLabel = languageSelect.options[languageSelect.selectedIndex].text;
+          const personProfile = meta.personProfile;
+          const isVoiceCloned = meta.isVoiceCloned;
+
+          // Narration
+          const scenes = meta.script?.scenes || [];
+          const narrationHtml = scenes.map((scene, i) =>
+            `<div style="margin: 5px 0; padding: 8px; background: #e8f5e9; border-radius: 5px;">
+              <strong>シーン${i + 1}:</strong> ${scene.narration || 'N/A'}
+            </div>`
+          ).join('');
+
+          // Composite image preview
+          const compositeImage = data.compositeImage;
+          const compositeHtml = compositeImage ? `
+            <div class="composite-preview" style="margin: 15px 0; padding: 10px; background: #f0f7ff; border-radius: 10px; border: 2px solid #4285f4;">
+              <strong>🎨 AI合成画像（Nano Banana Pro）</strong>
+              <p style="font-size: 12px; color: #666; margin: 5px 0;">人物が商品を持った合成画像</p>
+              <img src="data:image/jpeg;base64,${compositeImage}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            </div>
+          ` : '';
+
+          // V2 Profile
+          const v2Html = personProfile ? `
+            <div class="v2-profile">
+              <strong>👤 人物プロフィール（自動検出）</strong>
+              <p style="margin: 5px 0; font-size: 13px;">
+                <strong>名前:</strong> ${personProfile.suggestedPersonaName || 'N/A'}<br>
+                <strong>推定年齢:</strong> ${personProfile.estimatedAge || 'N/A'}歳 (${personProfile.ageGroup || 'N/A'})<br>
+                <strong>性別:</strong> ${personProfile.gender === 'male' ? '男性' : personProfile.gender === 'female' ? '女性' : 'その他'}<br>
+                <strong>声の特性:</strong> ${personProfile.voiceCharacteristics?.tone || 'N/A'} / ${personProfile.voiceCharacteristics?.style || 'N/A'}
+                ${isVoiceCloned ? '<br><span style="background:#667eea;color:white;padding:2px 8px;border-radius:8px;font-size:11px;">🎤 ボイスクローン使用</span>' : ''}
+              </p>
+            </div>
+          ` : '';
+
+          // Dual engine results
+          const videos = data.videos || {};
+          const recommended = data.recommended;
+          const selectedEngine = engineSelect.value;
+
+          // Build video results HTML
+          let videoResultsHtml = '';
+
+          // If "all" engine selected, show comparison grid
+          if (selectedEngine === 'all') {
+            const engines = [
+              { key: 'heygen', name: 'HeyGen', icon: '🎤', color: '#667eea', desc: 'リップシンク' },
+              { key: 'kling', name: 'Kling', icon: '🎬', color: '#f5a623', desc: 'モーション' },
+              { key: 'seedance', name: 'Seedance', icon: '🎥', color: '#38a169', desc: 'シネマティック' },
+              { key: 'veo3', name: 'Veo3', icon: '🔊', color: '#4285f4', desc: '音声付き' },
+            ];
+
+            let gridHtml = '<h4 style="margin:15px 0 10px;">🚀 全エンジン比較結果</h4><div class="comparison-grid">';
+
+            engines.forEach(eng => {
+              const result = videos[eng.key];
+              if (!result) return;
+
+              const isRecommended = recommended?.engine === eng.key;
+              const statusClass = result.success ? (isRecommended ? 'success recommended' : 'success') : 'failed';
+
+              gridHtml += `
+                <div class="engine-result-card ${statusClass}">
+                  <h4>
+                    <span>${eng.icon}</span>
+                    <span>${eng.name}</span>
+                    <small style="color:#666;font-weight:normal;">${eng.desc}</small>
+                    ${isRecommended ? '<span style="background:#ffd700;color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">推奨</span>' : ''}
+                    <span class="time-badge">${Math.floor(result.processingTime / 1000)}秒</span>
+                  </h4>
+                  ${result.success ? `
+                    <video controls src="${result.videoUrl}" style="width:100%;border-radius:8px;"></video>
+                    <div class="actions">
+                      <button class="btn-select" onclick="copyToClipboard('${result.videoUrl}')">📋 コピー</button>
+                      <button class="btn-download" onclick="window.open('${result.videoUrl}', '_blank')">⬇️ 開く</button>
+                    </div>
+                  ` : `
+                    <p style="color:#f44336;padding:20px;text-align:center;">❌ ${result.error || '生成失敗'}</p>
+                  `}
+                </div>
+              `;
+            });
+
+            gridHtml += '</div>';
+            videoResultsHtml = gridHtml;
+          } else {
+            // Original individual engine display
+
+          if (videos.heygen) {
+            const hg = videos.heygen;
+            videoResultsHtml += `
+              <div class="video-url-container" style="border-left: 4px solid ${hg.success ? '#4caf50' : '#f44336'};">
+                <strong>🎤 HeyGen（リップシンク）:</strong>
+                ${hg.success ? `
+                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(hg.processingTime / 1000)}秒)</span>
+                  ${recommended?.engine === 'heygen' ? '<span style="background:#667eea;color:white;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
+                  <a href="${hg.videoUrl}" target="_blank">${hg.videoUrl}</a>
+                  <div class="video-actions">
+                    <button class="btn-copy" onclick="copyToClipboard('${hg.videoUrl}')">📋 コピー</button>
+                    <button class="btn-open" onclick="window.open('${hg.videoUrl}', '_blank')">🎥 再生</button>
+                  </div>
+                ` : `<span style="color: #f44336;">❌ 失敗: ${hg.error}</span>`}
+              </div>
+            `;
+          }
+
+          if (videos.kling) {
+            const kg = videos.kling;
+            videoResultsHtml += `
+              <div class="video-url-container" style="border-left: 4px solid ${kg.success ? '#4caf50' : '#f44336'}; margin-top: 10px;">
+                <strong>🎬 Kling（モーション）:</strong>
+                ${kg.success ? `
+                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(kg.processingTime / 1000)}秒)</span>
+                  ${recommended?.engine === 'kling' ? '<span style="background:#667eea;color:white;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
+                  <a href="${kg.videoUrl}" target="_blank">${kg.videoUrl}</a>
+                  <div class="video-actions">
+                    <button class="btn-copy" onclick="copyToClipboard('${kg.videoUrl}')">📋 コピー</button>
+                    <button class="btn-open" onclick="window.open('${kg.videoUrl}', '_blank')">🎥 再生</button>
+                  </div>
+                ` : `<span style="color: #f44336;">❌ 失敗: ${kg.error}</span>`}
+              </div>
+            `;
+          }
+
+          if (videos.seedance) {
+            const sd = videos.seedance;
+            videoResultsHtml += `
+              <div class="video-url-container" style="border-left: 4px solid ${sd.success ? '#ffd700' : '#f44336'}; margin-top: 10px;">
+                <strong>🎥 Seedance（シネマティック）:</strong>
+                ${sd.success ? `
+                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(sd.processingTime / 1000)}秒)</span>
+                  ${recommended?.engine === 'seedance' ? '<span style="background:#ffd700;color:#000;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
+                  <a href="${sd.videoUrl}" target="_blank">${sd.videoUrl}</a>
+                  <div class="video-actions">
+                    <button class="btn-copy" onclick="copyToClipboard('${sd.videoUrl}')">📋 コピー</button>
+                    <button class="btn-open" onclick="window.open('${sd.videoUrl}', '_blank')">🎥 再生</button>
+                  </div>
+                ` : `<span style="color: #f44336;">❌ 失敗: ${sd.error}</span>`}
+              </div>
+            `;
+          }
+
+          if (videos.veo3) {
+            const v3 = videos.veo3;
+            videoResultsHtml += `
+              <div class="video-url-container" style="border-left: 4px solid ${v3.success ? '#4285f4' : '#f44336'}; margin-top: 10px;">
+                <strong>🔊 Veo3（音声付き・Google）:</strong>
+                ${v3.success ? `
+                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(v3.processingTime / 1000)}秒)</span>
+                  ${recommended?.engine === 'veo3' ? '<span style="background:#4285f4;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
+                  <a href="${v3.videoUrl}" target="_blank">${v3.videoUrl}</a>
+                  <div class="video-actions">
+                    <button class="btn-copy" onclick="copyToClipboard('${v3.videoUrl}')">📋 コピー</button>
+                    <button class="btn-open" onclick="window.open('${v3.videoUrl}', '_blank')">🎥 再生</button>
+                  </div>
+                ` : `<span style="color: #f44336;">❌ 失敗: ${v3.error}</span>`}
+              </div>
+            `;
+          }
+
+          // Fallback for single video URL
+          if (!videos.heygen && !videos.kling && !videos.seedance && !videos.veo3 && data.videoUrl) {
+            const videoUrl = data.videoUrl;
+            videoResultsHtml = `
+              <div class="video-url-container">
+                <strong>動画URL:</strong>
+                <a href="${videoUrl}" target="_blank">${videoUrl}</a>
+                <div class="video-actions">
+                  <button class="btn-copy" onclick="copyToClipboard('${videoUrl}')">📋 コピー</button>
+                  <button class="btn-open" onclick="window.open('${videoUrl}', '_blank')">🎥 再生</button>
+                </div>
+              </div>
+            `;
+          }
+          } // Close else block for non-"all" engine
+
+          resultContent.innerHTML = `
+            <p><strong>商品タイプ:</strong> ${productType}</p>
+            <p><strong>ペルソナ:</strong> ${personaName}, ${personaAge}歳</p>
+            <p><strong>シーン数:</strong> ${sceneCount}</p>
+            <p><strong>動画時間:</strong> ${duration}秒</p>
+            <p><strong>言語:</strong> ${langLabel}</p>
+            <p><strong>処理時間:</strong> ${procTime}秒</p>
+            ${compositeHtml}
+            ${v2Html}
+            <div style="margin: 10px 0;">
+              <strong>📝 ナレーション:</strong>
+              ${narrationHtml}
+            </div>
+            ${videoResultsHtml}
+          `;
+        } else {
+          throw new Error(data.error || '生成に失敗しました');
+        }
+      } catch (error) {
+        result.classList.add('error');
+        result.classList.add('show');
+
+        let errorMessage = error.message;
+        if (errorMessage.includes('flagged as sensitive') || errorMessage.includes('E005')) {
+          errorMessage = 'コンテンツモデレーションにより拒否されました。別の画像をお試しください。';
+        } else if (errorMessage.includes('timeout')) {
+          errorMessage = '動画生成がタイムアウトしました。もう一度お試しください。';
+        }
+
+        resultContent.innerHTML = '<p>❌ エラー: ' + errorMessage + '</p>';
+      } finally {
+        generateBtn.disabled = false;
+        updateAutoMode();
+      }
+    });
+
+    // Initial state
+    updateAutoMode();
+  </script>
+</body>
+</html>
