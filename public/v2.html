@@ -579,60 +579,218 @@
     <input type="file" id="person-input" accept="image/png,image/jpeg">
     <input type="file" id="voice-input" accept="audio/mp3,audio/wav,audio/m4a,audio/*">
 
-    <!-- Engine Selector (Radio Button) -->
-    <div class="engine-selector">
-      <h3>🎬 動画生成エンジンを選択</h3>
+    <!-- Engine Detail Cards Section -->
+    <div class="engine-cards-section" style="margin-bottom: 20px;">
+      <h3 style="font-size: 16px; margin-bottom: 15px; color: #333;">
+        🎬 動画エンジン詳細
+        <span style="font-size: 12px; color: #999; font-weight: 400; margin-left: 10px;">クリックで選択</span>
+      </h3>
 
-      <div class="engine-options">
-        <label class="engine-option">
-          <input type="radio" name="videoEngine" value="kling" checked>
-          <div class="engine-card">
-            <div class="engine-name">Kling v2.5<span class="badge">⭐おすすめ</span></div>
-            <div class="engine-desc">モーション特化・商品動作に最適</div>
-            <div class="engine-meta">~60秒 | $0.05/生成</div>
+      <div class="engine-cards-container">
+        <!-- HeyGen Card -->
+        <div class="engine-card" data-engine="heygen" style="--engine-color: #667eea;">
+          <input type="radio" name="videoEngine" value="heygen" style="display:none;">
+          <div class="card-header">
+            <span class="engine-icon">🎤</span>
+            <h4>
+              HeyGen
+              <span class="provider">HeyGen Inc.</span>
+            </h4>
           </div>
-        </label>
+          <p class="description">リップシンク特化、人物が話す動画に最適</p>
+          <div class="best-for">
+            <span class="tag">プレゼンター動画</span>
+            <span class="tag">説明動画</span>
+            <span class="tag">トーキングヘッド</span>
+          </div>
+          <div class="meta">
+            <div class="meta-item">
+              <span class="icon">⏱️</span>
+              <span class="value">60-120秒</span>
+              <span class="label">処理時間</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">💰</span>
+              <span class="value">$0.10</span>
+              <span class="label">コスト/回</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">⭐</span>
+              <span class="value">★★★★★</span>
+              <span class="label">品質</span>
+            </div>
+          </div>
+          <div class="features">
+            <span class="feature">Lip-Sync</span>
+            <span class="feature">Voice Cloning</span>
+            <span class="feature">多言語対応</span>
+          </div>
+        </div>
 
-        <label class="engine-option">
-          <input type="radio" name="videoEngine" value="heygen">
-          <div class="engine-card">
-            <div class="engine-name">HeyGen</div>
-            <div class="engine-desc">リップシンク・話す人物向け</div>
-            <div class="engine-meta">~90秒 | $0.08/生成</div>
+        <!-- Kling Card (Recommended) -->
+        <div class="engine-card recommended selected" data-engine="kling" style="--engine-color: #f5a623;">
+          <input type="radio" name="videoEngine" value="kling" checked style="display:none;">
+          <div class="card-header">
+            <span class="engine-icon">🎬</span>
+            <h4>
+              Kling v2.5 Turbo Pro
+              <span class="provider">Kuaishou (via Replicate)</span>
+            </h4>
           </div>
-        </label>
+          <p class="description">モーション特化、商品の動きを自然に生成</p>
+          <div class="best-for">
+            <span class="tag">商品紹介</span>
+            <span class="tag">動作デモ</span>
+            <span class="tag">UGC風動画</span>
+          </div>
+          <div class="meta">
+            <div class="meta-item">
+              <span class="icon">⏱️</span>
+              <span class="value">45-90秒</span>
+              <span class="label">処理時間</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">💰</span>
+              <span class="value">$0.05</span>
+              <span class="label">コスト/回</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">⭐</span>
+              <span class="value">★★★★☆</span>
+              <span class="label">品質</span>
+            </div>
+          </div>
+          <div class="features">
+            <span class="feature">Identity Preservation</span>
+            <span class="feature">First Frame Support</span>
+            <span class="feature">9:16対応</span>
+          </div>
+        </div>
 
-        <label class="engine-option">
-          <input type="radio" name="videoEngine" value="seedance">
-          <div class="engine-card">
-            <div class="engine-name">Seedance</div>
-            <div class="engine-desc">シネマティック・映画風品質</div>
-            <div class="engine-meta">~45秒 | $0.12/生成</div>
+        <!-- Seedance Card -->
+        <div class="engine-card" data-engine="seedance" style="--engine-color: #38a169;">
+          <input type="radio" name="videoEngine" value="seedance" style="display:none;">
+          <div class="card-header">
+            <span class="engine-icon">🎥</span>
+            <h4>
+              Seedance 1.0
+              <span class="provider">ByteDance (ModelArk)</span>
+            </h4>
           </div>
-        </label>
+          <p class="description">シネマティック品質、映画風の美しい映像</p>
+          <div class="best-for">
+            <span class="tag">ブランド動画</span>
+            <span class="tag">広告</span>
+            <span class="tag">アート作品</span>
+          </div>
+          <div class="meta">
+            <div class="meta-item">
+              <span class="icon">⏱️</span>
+              <span class="value">30-60秒</span>
+              <span class="label">処理時間</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">💰</span>
+              <span class="value">$0.03</span>
+              <span class="label">コスト/回</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">⭐</span>
+              <span class="value">★★★★☆</span>
+              <span class="label">品質</span>
+            </div>
+          </div>
+          <div class="features">
+            <span class="feature">Cinematic</span>
+            <span class="feature">Fast Generation</span>
+            <span class="feature">Cost Effective</span>
+          </div>
+        </div>
 
-        <label class="engine-option">
-          <input type="radio" name="videoEngine" value="veo3">
-          <div class="engine-card">
-            <div class="engine-name">Veo3</div>
-            <div class="engine-desc">音声同時生成・ナレーション対応</div>
-            <div class="engine-meta">~120秒 | $0.10/生成</div>
+        <!-- Veo3 Card -->
+        <div class="engine-card" data-engine="veo3" style="--engine-color: #4285f4;">
+          <input type="radio" name="videoEngine" value="veo3" style="display:none;">
+          <div class="card-header">
+            <span class="engine-icon">🔊</span>
+            <h4>
+              Veo 3.1
+              <span class="provider">Google DeepMind</span>
+            </h4>
           </div>
-        </label>
+          <p class="description">音声同時生成、ナレーション付き動画</p>
+          <div class="best-for">
+            <span class="tag">ナレーション動画</span>
+            <span class="tag">音声付きCM</span>
+            <span class="tag">SNS動画</span>
+          </div>
+          <div class="meta">
+            <div class="meta-item">
+              <span class="icon">⏱️</span>
+              <span class="value">90-180秒</span>
+              <span class="label">処理時間</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">💰</span>
+              <span class="value">$0.08</span>
+              <span class="label">コスト/回</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">⭐</span>
+              <span class="value">★★★★★</span>
+              <span class="label">品質</span>
+            </div>
+          </div>
+          <div class="features">
+            <span class="feature">Native Audio</span>
+            <span class="feature">High Quality</span>
+            <span class="feature">Long Duration</span>
+          </div>
+        </div>
 
-        <label class="engine-option">
-          <input type="radio" name="videoEngine" value="sora2">
-          <div class="engine-card">
-            <div class="engine-name">Sora2</div>
-            <div class="engine-desc">最高品質・OpenAI製</div>
-            <div class="engine-meta">~180秒 | $0.20/生成</div>
+        <!-- Sora2 Card -->
+        <div class="engine-card" data-engine="sora2" style="--engine-color: #10a37f;">
+          <input type="radio" name="videoEngine" value="sora2" style="display:none;">
+          <div class="card-header">
+            <span class="engine-icon">✨</span>
+            <h4>
+              Sora 2
+              <span class="provider">OpenAI (via Replicate)</span>
+            </h4>
           </div>
-        </label>
+          <p class="description">最高品質、リアリスティックな動画生成</p>
+          <div class="best-for">
+            <span class="tag">プロ品質CM</span>
+            <span class="tag">高級ブランド</span>
+            <span class="tag">映像作品</span>
+          </div>
+          <div class="meta">
+            <div class="meta-item">
+              <span class="icon">⏱️</span>
+              <span class="value">120-300秒</span>
+              <span class="label">処理時間</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">💰</span>
+              <span class="value">$0.15</span>
+              <span class="label">コスト/回</span>
+            </div>
+            <div class="meta-item">
+              <span class="icon">⭐</span>
+              <span class="value">★★★★★</span>
+              <span class="label">品質</span>
+            </div>
+          </div>
+          <div class="features">
+            <span class="feature">Best Quality</span>
+            <span class="feature">Realistic</span>
+            <span class="feature">Long Videos</span>
+          </div>
+        </div>
       </div>
 
-      <label class="compare-option">
+      <label class="compare-option" style="display: flex; align-items: center; gap: 8px; margin-top: 15px; padding: 12px; background: #f5f5f5; border-radius: 8px; cursor: pointer;">
         <input type="checkbox" id="enableCompare">
-        2つのエンジンで比較生成する（オプション）
+        <span style="font-size: 14px; font-weight: 600;">🚀 全エンジン一括生成モード（A/B比較）</span>
       </label>
     </div>
 
@@ -731,6 +889,78 @@
       return selected ? selected.value : 'kling';
     }
 
+    // Engine card click handlers
+    document.querySelectorAll('.engine-card').forEach(card => {
+      card.addEventListener('click', () => {
+        // Remove selected class from all cards
+        document.querySelectorAll('.engine-card').forEach(c => c.classList.remove('selected'));
+
+        // Add selected class to clicked card
+        card.classList.add('selected');
+
+        // Update radio button
+        const engine = card.dataset.engine;
+        const radio = card.querySelector('input[name="videoEngine"]');
+        if (radio) {
+          radio.checked = true;
+        }
+      });
+    });
+
+    // #50: 用途別おすすめエンジン自動選択
+    let recommendedEngine = 'kling';
+    const engineRecommendations = {
+      product: { engine: 'kling', name: 'Kling v2.5', reason: '商品動作に最適' },
+      person: { engine: 'heygen', name: 'HeyGen', reason: 'リップシンクに最適' },
+      voice: { engine: 'veo3', name: 'Veo3', reason: '音声同時生成に最適' },
+      premium: { engine: 'seedance', name: 'Seedance', reason: '高品質映像に最適' },
+    };
+
+    function updateRecommendation() {
+      const hasProduct = !!productFile;
+      const hasPerson = !!personFile;
+      const hasVoice = !!voiceFile;
+
+      if (!hasProduct) return;
+
+      // 用途に基づいてエンジンを推奨
+      let rec;
+      if (hasPerson && hasVoice) {
+        rec = engineRecommendations.person; // HeyGen - lip sync with voice
+      } else if (hasPerson) {
+        rec = engineRecommendations.person; // HeyGen - talking person
+      } else if (hasVoice) {
+        rec = engineRecommendations.voice; // Veo3 - native audio
+      } else {
+        rec = engineRecommendations.product; // Kling - product motion
+      }
+
+      recommendedEngine = rec.engine;
+
+      // おすすめバッジを更新
+      document.querySelectorAll('.engine-card').forEach(card => {
+        card.classList.remove('recommended');
+        if (card.dataset.engine === recommendedEngine) {
+          card.classList.add('recommended');
+        }
+      });
+    }
+
+    function selectEngine(engineName) {
+      document.querySelectorAll('.engine-card').forEach(card => {
+        card.classList.remove('selected');
+        const radio = card.querySelector('input[name="videoEngine"]');
+        if (card.dataset.engine === engineName) {
+          card.classList.add('selected');
+          if (radio) radio.checked = true;
+        }
+      });
+    }
+
+    function applyRecommendation() {
+      selectEngine(recommendedEngine);
+    }
+
     // Update auto mode status
     function updateAutoMode() {
       const hasProduct = !!productFile;
@@ -750,23 +980,26 @@
       } else if (hasPerson && hasVoice) {
         autoStatus.textContent = 'フル機能';
         autoStatus.style.background = '#4caf50';
-        autoDescription.textContent = '人物起用 + ボイスクローン有効';
+        autoDescription.textContent = '人物起用 + ボイスクローン有効 → HeyGen推奨';
       } else if (hasPerson) {
         autoStatus.textContent = '人物起用';
         autoStatus.style.background = '#2196f3';
-        autoDescription.textContent = '人物分析を自動実行します';
+        autoDescription.textContent = '人物分析を自動実行 → HeyGen推奨';
       } else if (hasVoice) {
         autoStatus.textContent = 'ボイスクローン';
         autoStatus.style.background = '#9c27b0';
-        autoDescription.textContent = '音声サンプルからボイスを生成';
+        autoDescription.textContent = '音声サンプルからボイス生成 → Veo3推奨';
       } else {
         autoStatus.textContent = 'V1相当';
         autoStatus.style.background = '#ff9800';
-        autoDescription.textContent = '商品画像のみで基本CM生成';
+        autoDescription.textContent = '商品画像のみ → Kling推奨';
       }
 
       // Enable/disable generate button
       generateBtn.disabled = !hasProduct;
+
+      // #50: Update recommendation
+      updateRecommendation();
     }
 
     // File upload handlers
