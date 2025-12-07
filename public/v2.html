@@ -398,7 +398,8 @@
         <span class="check-icon">✓</span>
         <div class="icon">👤</div>
         <div class="label">人物画像</div>
-        <div class="hint">CMに起用する人物</div>
+        <div class="hint">アップロードで合成モードON</div>
+        <div class="composite-badge" id="composite-badge" style="display:none; margin-top:5px; background:#4caf50; color:white; padding:3px 8px; border-radius:5px; font-size:11px;">🎨 AI合成モード</div>
         <div class="filename" id="person-filename"></div>
         <img class="preview-img" id="person-preview" style="display:none;">
       </div>
@@ -659,8 +660,17 @@
     }
 
     // Setup all upload handlers
+    const compositeBadge = document.getElementById('composite-badge');
     setupUpload(productBox, productInput, productFilename, productPreview, (f) => { productFile = f; }, 'image');
-    setupUpload(personBox, personInput, personFilename, personPreview, (f) => { personFile = f; }, 'image');
+    setupUpload(personBox, personInput, personFilename, personPreview, (f) => {
+      personFile = f;
+      // Show composite badge when person image is uploaded
+      if (f) {
+        compositeBadge.style.display = 'inline-block';
+      } else {
+        compositeBadge.style.display = 'none';
+      }
+    }, 'image');
     setupUpload(voiceBox, voiceInput, voiceFilename, null, (f) => { voiceFile = f; }, 'audio');
 
     function copyToClipboard(text) {
@@ -721,6 +731,16 @@
               <strong>シーン${i + 1}:</strong> ${scene.narration || 'N/A'}
             </div>`
           ).join('');
+
+          // Composite image preview
+          const compositeImage = data.compositeImage;
+          const compositeHtml = compositeImage ? `
+            <div class="composite-preview" style="margin: 15px 0; padding: 10px; background: #f0f7ff; border-radius: 10px; border: 2px solid #4285f4;">
+              <strong>🎨 AI合成画像（Nano Banana Pro）</strong>
+              <p style="font-size: 12px; color: #666; margin: 5px 0;">人物が商品を持った合成画像</p>
+              <img src="data:image/jpeg;base64,${compositeImage}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            </div>
+          ` : '';
 
           // V2 Profile
           const v2Html = personProfile ? `
@@ -837,6 +857,7 @@
             <p><strong>動画時間:</strong> ${duration}秒</p>
             <p><strong>言語:</strong> ${langLabel}</p>
             <p><strong>処理時間:</strong> ${procTime}秒</p>
+            ${compositeHtml}
             ${v2Html}
             <div style="margin: 10px 0;">
               <strong>📝 ナレーション:</strong>
