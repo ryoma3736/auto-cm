@@ -24,8 +24,10 @@ import {
   type Persona,
   type UGCScript,
 } from '../modules/script-generator/index.js';
-import { ImageProcessor } from '../modules/image-processor/index.js';
+import { ImageProcessor, createPresenterComposite } from '../modules/image-processor/index.js';
+import { AICompositor } from '../modules/image-processor/ai-composite.js';
 import { VideoGenerator, generatePersonPrompt, mergeWithScriptPrompt } from '../modules/video-generator/index.js';
+import { HeyGenGenerator } from '../modules/video-generator/heygen.js';
 import { VoiceGenerator } from '../modules/voice-generator/index.js';
 import { DriveStorage, type VideoFile } from '../modules/storage/index.js';
 // V2 imports
@@ -104,6 +106,11 @@ export interface PipelineOptions {
   // V2 options
   /** ElevenLabs API key for voice cloning */
   elevenLabsApiKey?: string;
+  // V3 options
+  /** HeyGen API key for lip-sync video */
+  heygenApiKey?: string;
+  /** Use HeyGen for lip-sync instead of Kling */
+  useHeyGen?: boolean;
 }
 
 // ========== Main Pipeline Class ==========
@@ -130,6 +137,9 @@ export class AdGenerationPipeline {
   // V2 modules
   private personAnalyzer: PersonAnalyzer;
   private voiceCloner: VoiceCloner;
+  private aiCompositor: AICompositor;
+  // V3 modules
+  private heygenGenerator: HeyGenGenerator | null = null;
 
   constructor(options: PipelineOptions = {}) {
     this.options = {
@@ -191,6 +201,24 @@ export class AdGenerationPipeline {
       openaiApiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
       useMock: options.useMock,
     });
+
+    // V2: Initialize AI Compositor for person-holding-product images
+    this.aiCompositor = new AICompositor({
+      geminiApiKey: process.env.GEMINI_API_KEY,
+      verbose: options.verbose,
+    });
+
+    // V3: Initialize HeyGen for lip-sync video (optional)
+    if (options.useHeyGen || options.heygenApiKey || process.env.HEYGEN_API_KEY) {
+      try {
+        this.heygenGenerator = new HeyGenGenerator({
+          apiKey: options.heygenApiKey || process.env.HEYGEN_API_KEY,
+        });
+      } catch (e) {
+        // HeyGen is optional, continue without it
+        console.log('⚠️ HeyGen not initialized:', (e as Error).message);
+      }
+    }
   }
 
   /**
@@ -311,9 +339,27 @@ export class AdGenerationPipeline {
       script = stage3.result.script;
 
       // ============================================================
-      // Stage 4: Image Extension to Vertical (9:16)
+      // Stage 4: Image Preparation (V2: AI-generated person holding product)
       // ============================================================
-      const stage4 = await this.executeStage('Image Extension to Vertical', async () => {
+      const stage4 = await this.executeStage('Image Preparation', async () => {
+        // V2: Use AI Compositor to generate realistic person-holding-product image
+        if (input.personImageBase64 && personProfile) {
+          this.log('V2 Mode: Generating AI composite (person holding product) with Gemini 3 Pro Image...');
+
+          const aiResult = await this.aiCompositor.generatePersonHoldingProduct({
+            personImageBase64: input.personImageBase64,
+            productImageBase64: imageBase64,
+            productAnalysis: productAnalysis!,
+            personProfile,
+            width: 720,
+            height: 1280,
+          });
+
+          this.log(`AI Composite ${aiResult.isAIGenerated ? 'generated' : 'fallback'}: ${aiResult.width}x${aiResult.height} (${aiResult.processingTime}ms)`);
+          return { extendedBase64: aiResult.base64, isPersonMode: true, isAIGenerated: aiResult.isAIGenerated };
+        }
+
+        // V1: Standard vertical extension
         this.log('Extending image to 9:16 aspect ratio...');
         const extended = await this.imageProcessor.extendToVertical(imageBase64, {
           targetAspectRatio: '9:16',
@@ -321,20 +367,24 @@ export class AdGenerationPipeline {
           preserveOriginal: true,
         });
         this.log(`Extended to ${extended.width}x${extended.height}`);
-        return { extendedBase64: extended.base64 };
+        return { extendedBase64: extended.base64, isPersonMode: false, isAIGenerated: false };
       });
       stages.push(stage4.stage);
 
       if (!stage4.result) {
-        throw new Error('Stage 4 failed: Image extension failed');
+        throw new Error('Stage 4 failed: Image preparation failed');
       }
 
-      const { extendedBase64 } = stage4.result;
+      const { extendedBase64, isPersonMode, isAIGenerated } = stage4.result;
 
       // ============================================================
-      // Stage 5: Resize to 720x1280 (Sora2 format)
+      // Stage 5: Resize to 720x1280 (Skip if already done in V2 mode)
       // ============================================================
       const stage5 = await this.executeStage('Resize to 720x1280', async () => {
+        if (isPersonMode) {
+          this.log('V2 Mode: Already resized in Stage 4, skipping...');
+          return { resizedBase64: extendedBase64 };
+        }
         this.log('Resizing to Sora2-compatible dimensions (720x1280)...');
         const resized = await this.imageProcessor.resizeTo720x1280(extendedBase64);
         this.log(`Resized: ${resized.width}x${resized.height}, ${resized.format}`);
@@ -349,35 +399,91 @@ export class AdGenerationPipeline {
       const { resizedBase64 } = stage5.result;
 
       // ============================================================
-      // Stage 6: Sora2 Video Generation (V2: Person-enhanced prompt)
+      // Stage 6: Kling Video Generation (V2: Identity-preserving prompt)
       // ============================================================
       const stage6 = await this.executeStage('Sora2 Video Generation', async () => {
-        this.log('Generating video with Sora2...');
+        this.log('Generating video with Kling v2.5 Turbo Pro...');
 
-        // V2: Generate person-enhanced prompt if person profile is available
-        let finalPrompt = script!.sora2Prompt;
+        let finalPrompt: string;
 
-        if (personProfile && productAnalysis) {
-          this.log('V2 Mode: Generating person-enhanced prompt...');
-          const personPromptResult = generatePersonPrompt({
-            personProfile,
-            productAnalysis,
-            script: script!,
-            duration: this.options.duration || 12,
-            language: this.options.language || 'ja',
-          });
+        if (isPersonMode && personProfile && productAnalysis) {
+          // V2: Person presenting product prompt (optimized for AI-generated composite)
+          this.log('V2 Mode: Generating presenter introduction prompt...');
 
-          finalPrompt = mergeWithScriptPrompt(personPromptResult, script!.sora2Prompt);
-          this.log(`Person-enhanced prompt generated (${finalPrompt.length} chars)`);
+          const productName = productAnalysis.productName || 'product';
+          const productColors = productAnalysis.colors?.join(', ') || '';
+          const productType = productAnalysis.productType || 'product';
+
+          // Build detailed product visual description (Issue #22)
+          const visualDetails = productAnalysis.visualDetails;
+          let productVisualDesc = '';
+
+          if (visualDetails) {
+            const secondaryColorText = visualDetails.secondaryColors && visualDetails.secondaryColors.length > 0
+              ? ` with ${visualDetails.secondaryColors.join(', ')} accents`
+              : '';
+
+            productVisualDesc = `
+PRODUCT VISUAL DETAILS (CRITICAL - DO NOT SUBSTITUTE):
+The exact product is a ${visualDetails.shape}:
+- Primary color: ${visualDetails.primaryColor}${secondaryColorText}
+- Brand text "${visualDetails.brandLogoText}" visible on ${visualDetails.brandLogoPosition}
+- ${visualDetails.packageStyle} design
+- ${visualDetails.materialAppearance} finish
+- Size: approximately ${visualDetails.estimatedSize}
+
+The product in her hands MUST match this description exactly throughout the video.`;
+          } else {
+            productVisualDesc = `
+PRODUCT DETAILS:
+The product is a ${productColors || 'white'} ${productType} bottle (${productName}).`;
+          }
+
+          // Optimized prompt: Person is ALREADY holding the product in the start frame
+          // IMPORTANT: Explicit talking/speaking instructions for natural lip movement
+          finalPrompt = `The woman in the image is ALREADY holding the product described below.
+${productVisualDesc}
+
+IMPORTANT - TALKING ANIMATION:
+She is ACTIVELY TALKING to the camera throughout the video.
+Her LIPS MOVE naturally as she speaks, explaining the product features with enthusiasm.
+Her mouth opens and closes naturally as she talks, with varied expressions.
+
+ACTIONS:
+1. She looks at the camera and starts talking with a warm smile
+2. She gently turns the bottle to show its label while continuing to speak
+3. She points at the product features with her other hand, still talking
+4. She nods occasionally while explaining, lips moving naturally
+
+STYLE: Natural UGC-style video, soft professional lighting
+The product in her hands stays EXACTLY the same throughout - do NOT change or substitute it.
+Smooth natural movements, authentic presenter style talking directly to the camera.
+The bottle label should remain visible and unchanged.`;
+
+          this.log(`Presenter prompt (AI composite): ${finalPrompt.substring(0, 100)}...`);
+        } else {
+          // V1: Standard prompt
+          finalPrompt = script!.sora2Prompt;
+
+          if (personProfile && productAnalysis) {
+            this.log('V1 Mode with person hint...');
+            const personPromptResult = generatePersonPrompt({
+              personProfile,
+              productAnalysis,
+              script: script!,
+              duration: this.options.duration || 12,
+              language: this.options.language || 'ja',
+            });
+            finalPrompt = mergeWithScriptPrompt(personPromptResult, script!.sora2Prompt);
+          }
         }
 
         this.log(`Prompt length: ${finalPrompt?.length || 0} chars`);
 
         // Validate prompt
         if (!finalPrompt || finalPrompt.trim() === '') {
-          console.error('❌ [Pipeline] ERROR: sora2Prompt is empty!');
-          console.error('❌ [Pipeline] Script object:', JSON.stringify(script, null, 2));
-          throw new Error('Script generation failed: Empty sora2Prompt');
+          console.error('❌ [Pipeline] ERROR: prompt is empty!');
+          throw new Error('Script generation failed: Empty prompt');
         }
 
         this.log(`Prompt preview: ${finalPrompt.substring(0, 100)}...`);
@@ -659,3 +765,21 @@ export class MovieCreationPipeline {
     throw new Error('MovieCreationPipeline.execute() is deprecated. Use AdGenerationPipeline.generate() instead.');
   }
 }
+
+// ========== V2 Exports ==========
+export {
+  PipelineV2,
+  createPipelineV2,
+  HEYGEN_PRESETS,
+  type VideoEngine,
+  type PipelineV2Input,
+  type PipelineV2Options,
+  type PipelineV2Result,
+  type VideoEngineResult,
+} from './v2.js';
+
+export { HeyGenGenerator } from '../modules/video-generator/heygen.js';
+export {
+  UnifiedVideoGenerator,
+  createUnifiedVideoGenerator,
+} from '../modules/video-generator/unified.js';
