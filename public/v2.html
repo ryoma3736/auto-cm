@@ -203,6 +203,82 @@
       outline: none;
     }
 
+    /* Comparison Grid for All Engines */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+    }
+    @media (max-width: 600px) {
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .engine-result-card {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border: 2px solid #e0e0e0;
+      transition: all 0.3s;
+    }
+    .engine-result-card.success {
+      border-color: #4caf50;
+    }
+    .engine-result-card.failed {
+      border-color: #f44336;
+      opacity: 0.7;
+    }
+    .engine-result-card.recommended {
+      border-color: #ffd700;
+      box-shadow: 0 4px 16px rgba(255,215,0,0.3);
+    }
+    .engine-result-card h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .engine-result-card .time-badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      margin-left: auto;
+    }
+    .engine-result-card video {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .engine-result-card .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .engine-result-card .actions button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .engine-result-card .actions .btn-select {
+      background: #667eea;
+      color: white;
+    }
+    .engine-result-card .actions .btn-select:hover {
+      background: #5a6fd6;
+    }
+    .engine-result-card .actions .btn-download {
+      background: #4caf50;
+      color: white;
+    }
+
     /* Feature Summary */
     .feature-summary {
       background: #f5f5f5;
@@ -759,9 +835,55 @@
           // Dual engine results
           const videos = data.videos || {};
           const recommended = data.recommended;
+          const selectedEngine = engineSelect.value;
 
           // Build video results HTML
           let videoResultsHtml = '';
+
+          // If "all" engine selected, show comparison grid
+          if (selectedEngine === 'all') {
+            const engines = [
+              { key: 'heygen', name: 'HeyGen', icon: '🎤', color: '#667eea', desc: 'リップシンク' },
+              { key: 'kling', name: 'Kling', icon: '🎬', color: '#f5a623', desc: 'モーション' },
+              { key: 'seedance', name: 'Seedance', icon: '🎥', color: '#38a169', desc: 'シネマティック' },
+              { key: 'veo3', name: 'Veo3', icon: '🔊', color: '#4285f4', desc: '音声付き' },
+            ];
+
+            let gridHtml = '<h4 style="margin:15px 0 10px;">🚀 全エンジン比較結果</h4><div class="comparison-grid">';
+
+            engines.forEach(eng => {
+              const result = videos[eng.key];
+              if (!result) return;
+
+              const isRecommended = recommended?.engine === eng.key;
+              const statusClass = result.success ? (isRecommended ? 'success recommended' : 'success') : 'failed';
+
+              gridHtml += `
+                <div class="engine-result-card ${statusClass}">
+                  <h4>
+                    <span>${eng.icon}</span>
+                    <span>${eng.name}</span>
+                    <small style="color:#666;font-weight:normal;">${eng.desc}</small>
+                    ${isRecommended ? '<span style="background:#ffd700;color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">推奨</span>' : ''}
+                    <span class="time-badge">${Math.floor(result.processingTime / 1000)}秒</span>
+                  </h4>
+                  ${result.success ? `
+                    <video controls src="${result.videoUrl}" style="width:100%;border-radius:8px;"></video>
+                    <div class="actions">
+                      <button class="btn-select" onclick="copyToClipboard('${result.videoUrl}')">📋 コピー</button>
+                      <button class="btn-download" onclick="window.open('${result.videoUrl}', '_blank')">⬇️ 開く</button>
+                    </div>
+                  ` : `
+                    <p style="color:#f44336;padding:20px;text-align:center;">❌ ${result.error || '生成失敗'}</p>
+                  `}
+                </div>
+              `;
+            });
+
+            gridHtml += '</div>';
+            videoResultsHtml = gridHtml;
+          } else {
+            // Original individual engine display
 
           if (videos.heygen) {
             const hg = videos.heygen;
@@ -849,6 +971,7 @@
               </div>
             `;
           }
+          } // Close else block for non-"all" engine
 
           resultContent.innerHTML = `
             <p><strong>商品タイプ:</strong> ${productType}</p>
