@@ -25,9 +25,12 @@ import {
   type UGCScript,
 } from '../modules/script-generator/index.js';
 import { ImageProcessor } from '../modules/image-processor/index.js';
-import { VideoGenerator } from '../modules/video-generator/index.js';
+import { VideoGenerator, generatePersonPrompt, mergeWithScriptPrompt } from '../modules/video-generator/index.js';
 import { VoiceGenerator } from '../modules/voice-generator/index.js';
 import { DriveStorage, type VideoFile } from '../modules/storage/index.js';
+// V2 imports
+import { PersonAnalyzer, type PersonProfile } from '../modules/person-analyzer/index.js';
+import { VoiceCloner } from '../modules/voice-cloner/index.js';
 
 // ========== Pipeline Interfaces ==========
 
@@ -42,6 +45,11 @@ export interface PipelineInput {
   outputFolderId?: string;
   /** Make uploaded video publicly accessible */
   makePublic?: boolean;
+  // V2: Person-based CM generation
+  /** Person image in Base64 (V2 feature) */
+  personImageBase64?: string;
+  /** Voice sample in Base64 for cloning (V2 feature) */
+  voiceSampleBase64?: string;
 }
 
 export interface PipelineResult {
@@ -58,6 +66,9 @@ export interface PipelineResult {
     script: UGCScript;
     processingTime: number;
     stages: StageResult[];
+    // V2: Person profile
+    personProfile?: PersonProfile;
+    isVoiceCloned?: boolean;
   };
   /** Error message (if failed) */
   error?: string;
@@ -90,6 +101,9 @@ export interface PipelineOptions {
   duration?: number;
   /** Script language (ja, en, zh) */
   language?: 'ja' | 'en' | 'zh';
+  // V2 options
+  /** ElevenLabs API key for voice cloning */
+  elevenLabsApiKey?: string;
 }
 
 // ========== Main Pipeline Class ==========
@@ -113,6 +127,9 @@ export class AdGenerationPipeline {
   private voiceGenerator: VoiceGenerator;
   private driveStorage: DriveStorage | null = null;
   private options: PipelineOptions;
+  // V2 modules
+  private personAnalyzer: PersonAnalyzer;
+  private voiceCloner: VoiceCloner;
 
   constructor(options: PipelineOptions = {}) {
     this.options = {
@@ -162,6 +179,18 @@ export class AdGenerationPipeline {
         useMock: options.useMock,
       });
     }
+
+    // V2: Initialize PersonAnalyzer and VoiceCloner
+    this.personAnalyzer = new PersonAnalyzer({
+      geminiApiKey: process.env.GEMINI_API_KEY,
+      useMock: options.useMock,
+    });
+
+    this.voiceCloner = new VoiceCloner({
+      elevenLabsApiKey: options.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY,
+      openaiApiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
+      useMock: options.useMock,
+    });
   }
 
   /**
@@ -179,6 +208,9 @@ export class AdGenerationPipeline {
     let script: UGCScript | null = null;
     let videoUrl: string | undefined;
     let driveLink: string | undefined;
+    // V2: Track person profile and voice cloning status
+    let personProfile: PersonProfile | undefined;
+    let isVoiceCloned = false;
 
     try {
       // ============================================================
@@ -231,6 +263,27 @@ export class AdGenerationPipeline {
       }
 
       productAnalysis = stage2.result.analysis;
+
+      // ============================================================
+      // Stage 2.5: Person Analysis (V2 - Optional)
+      // ============================================================
+      if (input.personImageBase64) {
+        const stage2_5 = await this.executeStage('Person Analysis (V2)', async () => {
+          this.log('Analyzing person image with Gemini Vision...');
+          const profile = await this.personAnalyzer.analyze({
+            personImage: input.personImageBase64!,
+            language: this.options.language || 'ja',
+          });
+          this.log(`Person: ${profile.suggestedPersonaName}, ${profile.estimatedAge}歳, ${profile.gender}`);
+          this.log(`Voice recommendation: ${profile.voiceCharacteristics.recommendedVoice}`);
+          return { profile };
+        });
+        stages.push(stage2_5.stage);
+
+        if (stage2_5.result) {
+          personProfile = stage2_5.result.profile;
+        }
+      }
 
       // ============================================================
       // Stage 3: Persona & Script Generation
@@ -296,24 +349,42 @@ export class AdGenerationPipeline {
       const { resizedBase64 } = stage5.result;
 
       // ============================================================
-      // Stage 6: Sora2 Video Generation
+      // Stage 6: Sora2 Video Generation (V2: Person-enhanced prompt)
       // ============================================================
       const stage6 = await this.executeStage('Sora2 Video Generation', async () => {
         this.log('Generating video with Sora2...');
-        this.log(`Prompt length: ${script!.sora2Prompt?.length || 0} chars`);
 
-        // Validate sora2Prompt
-        if (!script!.sora2Prompt || script!.sora2Prompt.trim() === '') {
+        // V2: Generate person-enhanced prompt if person profile is available
+        let finalPrompt = script!.sora2Prompt;
+
+        if (personProfile && productAnalysis) {
+          this.log('V2 Mode: Generating person-enhanced prompt...');
+          const personPromptResult = generatePersonPrompt({
+            personProfile,
+            productAnalysis,
+            script: script!,
+            duration: this.options.duration || 12,
+            language: this.options.language || 'ja',
+          });
+
+          finalPrompt = mergeWithScriptPrompt(personPromptResult, script!.sora2Prompt);
+          this.log(`Person-enhanced prompt generated (${finalPrompt.length} chars)`);
+        }
+
+        this.log(`Prompt length: ${finalPrompt?.length || 0} chars`);
+
+        // Validate prompt
+        if (!finalPrompt || finalPrompt.trim() === '') {
           console.error('❌ [Pipeline] ERROR: sora2Prompt is empty!');
           console.error('❌ [Pipeline] Script object:', JSON.stringify(script, null, 2));
           throw new Error('Script generation failed: Empty sora2Prompt');
         }
 
-        this.log(`Prompt preview: ${script!.sora2Prompt.substring(0, 100)}...`);
+        this.log(`Prompt preview: ${finalPrompt.substring(0, 100)}...`);
 
         const videoResult = await this.videoGenerator.generateAndWait({
           firstFrameImage: resizedBase64,
-          prompt: script!.sora2Prompt,
+          prompt: finalPrompt,
           duration: this.options.duration || 12,
           aspectRatio: '9:16',
         });
@@ -332,28 +403,44 @@ export class AdGenerationPipeline {
       videoUrl = stage6.result.videoResult.videoUrl;
 
       // ============================================================
-      // Stage 7: Voice Generation & Audio Merge
+      // Stage 7: Voice Generation & Audio Merge (V1/V2 hybrid)
       // ============================================================
       const stage7 = await this.executeStage('Voice Generation & Merge', async () => {
         const language = this.options.language || 'ja';
         this.log(`Generating ${language} voice narration...`);
 
-        // Generate voice from all scene narrations
-        const voiceResult = await this.voiceGenerator.generateForScenes(
-          script!.scenes,
-          language
-        );
-        this.log(`Voice generated: ${voiceResult.duration.toFixed(1)}s`);
+        let voiceResult;
+        let cloned = false;
+
+        // V2: Use VoiceCloner if person profile or voice sample is available
+        if (personProfile || input.voiceSampleBase64) {
+          this.log('V2 Mode: Using VoiceCloner...');
+          voiceResult = await this.voiceCloner.generateForScenes(
+            script!.scenes,
+            language,
+            personProfile,
+            input.voiceSampleBase64
+          );
+          cloned = !!input.voiceSampleBase64;
+          this.log(`Voice ${cloned ? 'cloned' : 'generated'}: ${voiceResult.duration.toFixed(1)}s`);
+        } else {
+          // V1: Use standard VoiceGenerator
+          voiceResult = await this.voiceGenerator.generateForScenes(
+            script!.scenes,
+            language
+          );
+          this.log(`Voice generated: ${voiceResult.duration.toFixed(1)}s`);
+        }
 
         // Merge audio with video
         this.log('Merging audio with video...');
-        const mergedVideoPath = await this.voiceGenerator.mergeAudioWithVideo({
-          videoPath: videoUrl!,
-          audioPath: voiceResult.audioPath,
-        });
+        const mergedVideoPath = await this.voiceCloner.mergeAudioWithVideo(
+          videoUrl!,
+          voiceResult.audioPath
+        );
 
         this.log(`Video with voice created: ${mergedVideoPath}`);
-        return { mergedVideoPath, voiceDuration: voiceResult.duration };
+        return { mergedVideoPath, voiceDuration: voiceResult.duration, isCloned: cloned };
       });
       stages.push(stage7.stage);
 
@@ -362,6 +449,7 @@ export class AdGenerationPipeline {
         // For local file, we need to serve it or return the path
         // For now, keep original URL but note that merged video is available locally
         this.log(`Merged video available at: ${stage7.result.mergedVideoPath}`);
+        isVoiceCloned = stage7.result.isCloned;
       }
 
       // ============================================================
@@ -433,6 +521,9 @@ export class AdGenerationPipeline {
           script: script!,
           processingTime,
           stages,
+          // V2 metadata
+          personProfile,
+          isVoiceCloned,
         },
       };
     } catch (error) {
