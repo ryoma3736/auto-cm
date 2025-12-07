@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auto-CM V2 - 人物起用CM生成</title>
+  <link rel="stylesheet" href="/css/engine-cards.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -201,6 +202,90 @@
     .setting-group select:hover, .setting-group select:focus {
       border-color: #667eea;
       outline: none;
+    }
+
+    /* Engine Selector (Radio Button) */
+    .engine-selector {
+      margin-bottom: 20px;
+    }
+    .engine-selector h3 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .engine-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .engine-option {
+      display: flex;
+      align-items: flex-start;
+      padding: 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .engine-option:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    .engine-option input[type="radio"] {
+      margin: 4px 10px 0 0;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .engine-option:has(input:checked) {
+      border-color: #4CAF50;
+      background: #f0fff0;
+      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+    }
+    .engine-card {
+      flex: 1;
+    }
+    .engine-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .engine-desc {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 3px;
+    }
+    .engine-meta {
+      font-size: 11px;
+      color: #999;
+    }
+    .badge {
+      background: #FFD700;
+      color: #000;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 5px;
+    }
+    .compare-option {
+      display: flex;
+      align-items: center;
+      margin-top: 15px;
+      padding: 10px 12px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #555;
+      cursor: pointer;
+    }
+    .compare-option input[type="checkbox"] {
+      margin-right: 8px;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
     }
 
     /* Comparison Grid for All Engines */
@@ -494,18 +579,65 @@
     <input type="file" id="person-input" accept="image/png,image/jpeg">
     <input type="file" id="voice-input" accept="audio/mp3,audio/wav,audio/m4a,audio/*">
 
+    <!-- Engine Selector (Radio Button) -->
+    <div class="engine-selector">
+      <h3>🎬 動画生成エンジンを選択</h3>
+
+      <div class="engine-options">
+        <label class="engine-option">
+          <input type="radio" name="videoEngine" value="kling" checked>
+          <div class="engine-card">
+            <div class="engine-name">Kling v2.5<span class="badge">⭐おすすめ</span></div>
+            <div class="engine-desc">モーション特化・商品動作に最適</div>
+            <div class="engine-meta">~60秒 | $0.05/生成</div>
+          </div>
+        </label>
+
+        <label class="engine-option">
+          <input type="radio" name="videoEngine" value="heygen">
+          <div class="engine-card">
+            <div class="engine-name">HeyGen</div>
+            <div class="engine-desc">リップシンク・話す人物向け</div>
+            <div class="engine-meta">~90秒 | $0.08/生成</div>
+          </div>
+        </label>
+
+        <label class="engine-option">
+          <input type="radio" name="videoEngine" value="seedance">
+          <div class="engine-card">
+            <div class="engine-name">Seedance</div>
+            <div class="engine-desc">シネマティック・映画風品質</div>
+            <div class="engine-meta">~45秒 | $0.12/生成</div>
+          </div>
+        </label>
+
+        <label class="engine-option">
+          <input type="radio" name="videoEngine" value="veo3">
+          <div class="engine-card">
+            <div class="engine-name">Veo3</div>
+            <div class="engine-desc">音声同時生成・ナレーション対応</div>
+            <div class="engine-meta">~120秒 | $0.10/生成</div>
+          </div>
+        </label>
+
+        <label class="engine-option">
+          <input type="radio" name="videoEngine" value="sora2">
+          <div class="engine-card">
+            <div class="engine-name">Sora2</div>
+            <div class="engine-desc">最高品質・OpenAI製</div>
+            <div class="engine-meta">~180秒 | $0.20/生成</div>
+          </div>
+        </label>
+      </div>
+
+      <label class="compare-option">
+        <input type="checkbox" id="enableCompare">
+        2つのエンジンで比較生成する（オプション）
+      </label>
+    </div>
+
     <!-- Settings -->
     <div class="settings">
-      <div class="setting-group">
-        <label>🎬 動画エンジン</label>
-        <select id="engine-select">
-          <option value="heygen" selected>HeyGen（リップシンク）</option>
-          <option value="kling">Kling（モーション）</option>
-          <option value="seedance">Seedance（シネマティック）</option>
-          <option value="veo3">Veo3（音声付き・Google）</option>
-          <option value="all">🚀 全エンジン一括生成（A/B比較）</option>
-        </select>
-      </div>
       <div class="setting-group">
         <label>⏱️ 動画時間</label>
         <select id="duration-select">
@@ -520,30 +652,6 @@
           <option value="en">English</option>
           <option value="zh">中文</option>
         </select>
-      </div>
-    </div>
-
-    <!-- Engine Descriptions - All Engines -->
-    <div class="engine-descriptions" style="display: grid; gap: 8px; margin-bottom: 20px;">
-      <div class="engine-desc-item" data-engine="heygen" style="background: #f0f2ff; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #667eea; cursor: pointer; transition: all 0.2s;">
-        <strong>🎤 HeyGen:</strong> 人が話すリップシンク動画<br>
-        <span style="color:#666;font-size:12px;">→ インフルエンサー風PR、商品レビュー、説明動画向け</span>
-      </div>
-      <div class="engine-desc-item" data-engine="kling" style="background: #fff8f0; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #f5a623; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
-        <strong>🎬 Kling:</strong> 商品が動くモーション動画<br>
-        <span style="color:#666;font-size:12px;">→ 商品PV、ブランドCM、SNS広告向け</span>
-      </div>
-      <div class="engine-desc-item" data-engine="seedance" style="background: #f0fff4; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #38a169; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
-        <strong>🎥 Seedance:</strong> 映画風シネマティック動画<br>
-        <span style="color:#666;font-size:12px;">→ 高品質ブランドCM、プレミアム商品紹介、ティザー動画向け</span>
-      </div>
-      <div class="engine-desc-item" data-engine="veo3" style="background: #e8f4f8; border-radius: 8px; padding: 10px 12px; border-left: 4px solid #4285f4; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
-        <strong>🔊 Veo3:</strong> 音声付きシネマティック動画（Google）<br>
-        <span style="color:#666;font-size:12px;">→ 会話・効果音付き動画、高品質ナレーション、没入型コンテンツ向け</span>
-      </div>
-      <div class="engine-desc-item" data-engine="all" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); border-radius: 8px; padding: 10px 12px; border-left: 4px solid #ff6b6b; cursor: pointer; transition: all 0.2s; opacity: 0.7;">
-        <strong>🚀 全エンジン一括:</strong> 4エンジン同時生成でA/B比較<br>
-        <span style="color:#666;font-size:12px;">→ 最適なエンジン選定、マーケティングテスト用</span>
       </div>
     </div>
 
@@ -605,50 +713,23 @@
     const resultContent = document.getElementById('result-content');
     const durationSelect = document.getElementById('duration-select');
     const languageSelect = document.getElementById('language-select');
-    const engineSelect = document.getElementById('engine-select');
     const autoStatus = document.getElementById('auto-status');
     const autoDescription = document.getElementById('auto-description');
     const featBasic = document.getElementById('feat-basic');
     const featPerson = document.getElementById('feat-person');
     const featVoice = document.getElementById('feat-voice');
+    const enableCompare = document.getElementById('enableCompare');
 
     // File storage
     let productFile = null;
     let personFile = null;
     let voiceFile = null;
 
-    // Engine card selection
-    const engineCards = document.querySelectorAll('.engine-desc-item');
-
-    function updateEngineSelection(selectedEngine) {
-      engineCards.forEach(card => {
-        if (card.dataset.engine === selectedEngine) {
-          card.style.opacity = '1';
-          card.style.transform = 'scale(1.02)';
-          card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-        } else {
-          card.style.opacity = '0.6';
-          card.style.transform = 'scale(1)';
-          card.style.boxShadow = 'none';
-        }
-      });
+    // Get selected engine from radio buttons
+    function getSelectedEngine() {
+      const selected = document.querySelector('input[name="videoEngine"]:checked');
+      return selected ? selected.value : 'kling';
     }
-
-    // Click on card to select engine
-    engineCards.forEach(card => {
-      card.addEventListener('click', () => {
-        engineSelect.value = card.dataset.engine;
-        updateEngineSelection(card.dataset.engine);
-      });
-    });
-
-    // Sync with dropdown
-    engineSelect.addEventListener('change', () => {
-      updateEngineSelection(engineSelect.value);
-    });
-
-    // Initial selection
-    updateEngineSelection(engineSelect.value);
 
     // Update auto mode status
     function updateAutoMode() {
@@ -764,7 +845,11 @@
       formData.append('image', productFile);
       formData.append('duration', durationSelect.value);
       formData.append('language', languageSelect.value);
-      formData.append('videoEngine', engineSelect.value);
+
+      // Use radio button selection or "all" mode for comparison
+      const selectedEngine = getSelectedEngine();
+      const compareMode = enableCompare.checked;
+      formData.append('videoEngine', compareMode ? 'all' : selectedEngine);
 
       // V2: Auto-add person and voice if available
       if (personFile) formData.append('personImage', personFile);
@@ -830,13 +915,13 @@
           // Dual engine results
           const videos = data.videos || {};
           const recommended = data.recommended;
-          const selectedEngine = engineSelect.value;
+          const actualEngine = compareMode ? 'all' : getSelectedEngine();
 
           // Build video results HTML
           let videoResultsHtml = '';
 
           // If "all" engine selected, show comparison grid
-          if (selectedEngine === 'all') {
+          if (actualEngine === 'all') {
             const engines = [
               { key: 'heygen', name: 'HeyGen', icon: '🎤', color: '#667eea', desc: 'リップシンク' },
               { key: 'kling', name: 'Kling', icon: '🎬', color: '#f5a623', desc: 'モーション' },
