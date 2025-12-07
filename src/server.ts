@@ -3,6 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { AdGenerationPipeline } from './pipeline/index.js';
+import { PipelineV2, type VideoEngine } from './pipeline/v2.js';
 
 const app = express();
 const PORT = 8888;
@@ -12,6 +13,13 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
+
+// V2: Multiple file upload config
+const uploadFields = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'personImage', maxCount: 1 },
+  { name: 'voiceSample', maxCount: 1 }
+]);
 
 app.use(express.json());
 app.use(express.static(path.join(process.cwd(), 'public')));
@@ -273,34 +281,109 @@ app.get('/old', (req, res) => {
 });
 */
 
-// API: 動画生成
-app.post('/api/generate', upload.single('image'), async (req, res) => {
+// API: 動画生成 (V1 + V2 対応)
+app.post('/api/generate', uploadFields, async (req, res) => {
   try {
-    if (!req.file) {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+    if (!files?.image?.[0]) {
       return res.status(400).json({ success: false, error: '画像がアップロードされていません' });
     }
 
-    const imageBase64 = req.file.buffer.toString('base64');
+    const imageBase64 = files.image[0].buffer.toString('base64');
     const duration = parseInt(req.body.duration) || 12;
     const language = req.body.language || 'ja';
 
-    console.log(`📋 [API] Duration: ${duration}s, Language: ${language}`);
+    // V2: Person image and voice sample
+    const personImageBase64 = files?.personImage?.[0]?.buffer.toString('base64');
+    const voiceSampleBase64 = files?.voiceSample?.[0]?.buffer.toString('base64');
+
+    const isV2Mode = !!personImageBase64 || !!voiceSampleBase64;
+    console.log(`📋 [API] Duration: ${duration}s, Language: ${language}${isV2Mode ? ', V2 Mode: ON' : ''}`);
+    if (personImageBase64) console.log(`   👤 Person image: ${files.personImage![0].originalname}`);
+    if (voiceSampleBase64) console.log(`   🎤 Voice sample: ${files.voiceSample![0].originalname}`);
 
     const pipeline = new AdGenerationPipeline({
       useMock: false, // 本番APIを使用（Gemini Vision + Nano Banana Pro）
-      mockVideoOnly: !process.env.REPLICATE_API_TOKEN, // Replicate APIトークンがあればSora 2使用
+      mockVideoOnly: false, // 実機モード
       verbose: true,
       duration,
       language,
+      elevenLabsApiKey: process.env.ELEVENLABS_API_KEY, // V2: Voice cloning
     });
 
     const result = await pipeline.generate({
       imageBase64,
+      // V2 inputs
+      personImageBase64,
+      voiceSampleBase64,
     });
 
     res.json(result);
   } catch (error) {
     console.error('Generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// API: V2 動画生成（デュアルエンジン対応）
+app.post('/api/generate-v2', uploadFields, async (req, res) => {
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+    if (!files?.image?.[0]) {
+      return res.status(400).json({ success: false, error: '画像がアップロードされていません' });
+    }
+
+    const imageBase64 = files.image[0].buffer.toString('base64');
+    const duration = parseInt(req.body.duration) || 5;
+    const language = (req.body.language || 'ja') as 'ja' | 'en' | 'zh';
+
+    // Support both selectedEngines (new) and videoEngine (legacy)
+    let selectedEngines: VideoEngine[] | undefined;
+    let videoEngine: VideoEngine | undefined;
+
+    if (req.body.selectedEngines) {
+      try {
+        selectedEngines = JSON.parse(req.body.selectedEngines) as VideoEngine[];
+      } catch (e) {
+        console.warn('Failed to parse selectedEngines, falling back to videoEngine');
+      }
+    }
+
+    if (!selectedEngines) {
+      videoEngine = (req.body.videoEngine || 'heygen') as VideoEngine;
+    }
+
+    // V2: Person image and voice sample
+    const personImageBase64 = files?.personImage?.[0]?.buffer.toString('base64');
+    const voiceSampleBase64 = files?.voiceSample?.[0]?.buffer.toString('base64');
+
+    console.log(`📋 [API V2] Engines: ${selectedEngines ? selectedEngines.join(', ') : videoEngine}, Duration: ${duration}s, Language: ${language}`);
+    if (personImageBase64) console.log(`   👤 Person image: ${files.personImage![0].originalname}`);
+    if (voiceSampleBase64) console.log(`   🎤 Voice sample: ${files.voiceSample![0].originalname}`);
+
+    const pipeline = new PipelineV2({
+      language,
+      duration,
+      useMock: false,
+      verbose: true,
+    });
+
+    const result = await pipeline.generate({
+      imageBase64,
+      personImageBase64,
+      voiceSampleBase64,
+      selectedEngines,
+      videoEngine,
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('V2 Generation error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

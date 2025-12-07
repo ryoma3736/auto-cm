@@ -24,13 +24,14 @@ import { VideoGenerator } from '../modules/video-generator/index.js';
 import { HeyGenGenerator } from '../modules/video-generator/heygen.js';
 import { SeedanceGenerator } from '../modules/video-generator/seedance.js';
 import { Veo3Generator } from '../modules/video-generator/veo3.js';
+import { Sora2Generator } from '../modules/video-generator/sora2.js';
 import { VoiceGenerator } from '../modules/voice-generator/index.js';
 import { PersonAnalyzer, type PersonProfile } from '../modules/person-analyzer/index.js';
 import { VoiceCloner } from '../modules/voice-cloner/index.js';
 
 // ========== V2 Types ==========
 
-export type VideoEngine = 'kling' | 'heygen' | 'seedance' | 'veo3' | 'all' | 'both';
+export type VideoEngine = 'kling' | 'heygen' | 'seedance' | 'veo3' | 'sora2' | 'all' | 'both';
 
 export interface PipelineV2Input {
   /** Product image (path, URL, or base64) */
@@ -44,8 +45,11 @@ export interface PipelineV2Input {
   /** Voice sample for cloning */
   voiceSampleBase64?: string;
 
-  /** Video engine selection */
+  /** Video engine selection (deprecated - use selectedEngines) */
   videoEngine?: VideoEngine;
+
+  /** Selected engines for multi-engine generation */
+  selectedEngines?: VideoEngine[];
 
   /** HeyGen talking photo ID (optional - uses preset if not provided) */
   talkingPhotoId?: string;
@@ -88,6 +92,7 @@ export interface PipelineV2Result {
     heygen?: VideoEngineResult;
     seedance?: VideoEngineResult;
     veo3?: VideoEngineResult;
+    sora2?: VideoEngineResult;
   };
   /** Composite image if generated */
   compositeImage?: string;
@@ -130,6 +135,7 @@ export class PipelineV2 {
   private heygenGenerator: HeyGenGenerator | null = null;
   private seedanceGenerator: SeedanceGenerator | null = null;
   private veo3Generator: Veo3Generator | null = null;
+  private sora2Generator: Sora2Generator | null = null;
   private voiceGenerator: VoiceGenerator;
   private personAnalyzer: PersonAnalyzer;
   private voiceCloner: VoiceCloner;
@@ -195,6 +201,15 @@ export class PipelineV2 {
       this.log('✓ Veo3 generator initialized (Gemini API)');
     }
 
+    // Initialize Sora2 if available (Replicate API)
+    if (process.env.REPLICATE_API_TOKEN) {
+      this.sora2Generator = new Sora2Generator({
+        replicateApiToken: process.env.REPLICATE_API_TOKEN,
+        useMock: options.useMock,
+      });
+      this.log('✓ Sora2 generator initialized (Replicate API)');
+    }
+
     this.voiceGenerator = new VoiceGenerator({
       useMock: options.useMock,
     });
@@ -219,11 +234,14 @@ export class PipelineV2 {
    */
   async generate(input: PipelineV2Input): Promise<PipelineV2Result> {
     const startTime = Date.now();
-    const engine = input.videoEngine || 'both';
+
+    // Use selectedEngines if provided, otherwise fall back to videoEngine
+    const selectedEngines = input.selectedEngines;
+    const engine: VideoEngine = input.videoEngine || 'both';
 
     this.log('═══════════════════════════════════════════');
     this.log('   Pipeline V2 - Starting Generation');
-    this.log(`   Engine: ${engine}`);
+    this.log(`   Engine: ${selectedEngines ? selectedEngines.join(', ') : engine}`);
     this.log('═══════════════════════════════════════════');
 
     try {
@@ -249,7 +267,9 @@ export class PipelineV2 {
 
       // Stage 5: Generate videos
       this.log('\n🎬 Stage 5: Generating videos...');
-      const videos = await this.generateVideos(input, imageBase64, narrationText, engine);
+      const videos = selectedEngines ?
+        await this.generateWithSelectedEngines(input, imageBase64, narrationText, selectedEngines) :
+        await this.generateVideos(input, imageBase64, narrationText, engine);
 
       // Determine recommended video
       let recommended: VideoEngineResult | undefined;
@@ -300,7 +320,78 @@ export class PipelineV2 {
   }
 
   /**
-   * Generate videos with selected engines
+   * Generate with selected engines (new multi-select approach)
+   */
+  private async generateWithSelectedEngines(
+    input: PipelineV2Input,
+    imageBase64: string,
+    narrationText: string,
+    selectedEngines: VideoEngine[]
+  ): Promise<PipelineV2Result['videos']> {
+    const results: PipelineV2Result['videos'] = {};
+
+    // Create promises for selected engines
+    const promises: Promise<[string, VideoEngineResult]>[] = [];
+
+    for (const engine of selectedEngines) {
+      if (engine === 'all') {
+        // "all" means run all available engines
+        const allResult = await this.generateWithAllEngines(input);
+        return allResult.videos;
+      }
+
+      switch (engine) {
+        case 'kling':
+          promises.push(
+            this.generateWithKling(imageBase64, narrationText)
+              .then(r => ['kling', r] as [string, VideoEngineResult])
+              .catch(e => ['kling', { engine: 'kling', success: false, error: e.message, processingTime: 0 }] as [string, VideoEngineResult])
+          );
+          break;
+        case 'heygen':
+          promises.push(
+            this.generateWithHeyGen(input, narrationText)
+              .then(r => ['heygen', r] as [string, VideoEngineResult])
+              .catch(e => ['heygen', { engine: 'heygen', success: false, error: e.message, processingTime: 0 }] as [string, VideoEngineResult])
+          );
+          break;
+        case 'seedance':
+          promises.push(
+            this.generateWithSeedance(imageBase64, narrationText)
+              .then(r => ['seedance', r] as [string, VideoEngineResult])
+              .catch(e => ['seedance', { engine: 'seedance', success: false, error: e.message, processingTime: 0 }] as [string, VideoEngineResult])
+          );
+          break;
+        case 'veo3':
+          promises.push(
+            this.generateWithVeo3(imageBase64, narrationText)
+              .then(r => ['veo3', r] as [string, VideoEngineResult])
+              .catch(e => ['veo3', { engine: 'veo3', success: false, error: e.message, processingTime: 0 }] as [string, VideoEngineResult])
+          );
+          break;
+        case 'sora2':
+          promises.push(
+            this.generateWithSora2(imageBase64, narrationText)
+              .then(r => ['sora2', r] as [string, VideoEngineResult])
+              .catch(e => ['sora2', { engine: 'sora2', success: false, error: e.message, processingTime: 0 }] as [string, VideoEngineResult])
+          );
+          break;
+      }
+    }
+
+    // Run all selected engines in parallel
+    const settled = await Promise.all(promises);
+
+    // Map results
+    for (const [engine, result] of settled) {
+      (results as Record<string, VideoEngineResult>)[engine] = result;
+    }
+
+    return results;
+  }
+
+  /**
+   * Generate videos with selected engines (legacy compatibility)
    */
   private async generateVideos(
     input: PipelineV2Input,
@@ -346,6 +437,8 @@ export class PipelineV2 {
       results.seedance = await this.generateWithSeedance(imageBase64, narrationText);
     } else if (engine === 'veo3') {
       results.veo3 = await this.generateWithVeo3(imageBase64, narrationText);
+    } else if (engine === 'sora2') {
+      results.sora2 = await this.generateWithSora2(imageBase64, narrationText);
     } else if (engine === 'all') {
       // Run all engines in parallel
       const allResult = await this.generateWithAllEngines(input);
@@ -558,6 +651,58 @@ UGC influencer style, vertical video format.`;
       this.log(`   [Veo3] ✗ Failed: ${error instanceof Error ? error.message : error}`);
       return {
         engine: 'veo3',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        processingTime: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Generate with Sora2 (OpenAI - High Quality)
+   */
+  private async generateWithSora2(
+    imageBase64: string,
+    narrationText: string
+  ): Promise<VideoEngineResult> {
+    const startTime = Date.now();
+    this.log('   [Sora2] Starting...');
+
+    if (!this.sora2Generator) {
+      return {
+        engine: 'sora2',
+        success: false,
+        error: 'Sora2 not initialized (REPLICATE_API_TOKEN not set)',
+        processingTime: 0,
+      };
+    }
+
+    try {
+      const prompt = `A presenter shows this product to the camera with enthusiasm.
+High quality cinematic video, professional lighting, smooth motion.
+The presenter holds the product gently and shows it naturally.
+UGC influencer style, vertical video format.`;
+
+      const result = await this.sora2Generator.generateAndWait({
+        firstFrameImage: imageBase64,
+        prompt,
+        duration: 5,
+        aspectRatio: '9:16',
+        resolution: '720p',
+      });
+
+      this.log(`   [Sora2] ✓ Completed in ${Math.floor((Date.now() - startTime) / 1000)}s`);
+
+      return {
+        engine: 'sora2',
+        success: true,
+        videoUrl: result.videoUrl,
+        processingTime: Date.now() - startTime,
+      };
+    } catch (error) {
+      this.log(`   [Sora2] ✗ Failed: ${error instanceof Error ? error.message : error}`);
+      return {
+        engine: 'sora2',
         success: false,
         error: error instanceof Error ? error.message : String(error),
         processingTime: Date.now() - startTime,
