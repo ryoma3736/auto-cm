@@ -3,6 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { AdGenerationPipeline } from './pipeline/index.js';
+import { PipelineV2, type VideoEngine } from './pipeline/v2.js';
 
 const app = express();
 const PORT = 8888;
@@ -308,6 +309,81 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
   }
 });
 
+// API: V2 動画生成（単一エンジン最適化）
+app.post('/api/generate-v2', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '画像がアップロードされていません' });
+    }
+
+    const imageBase64 = req.file.buffer.toString('base64');
+    const videoEngine = (req.body.videoEngine || 'both') as VideoEngine;
+    const narrationText = req.body.narrationText;
+    const personImageBase64 = req.body.personImageBase64;
+    const audioUrl = req.body.audioUrl;
+
+    // Comparison mode (Issue #51)
+    const compareMode = req.body.compareMode === 'true' || req.body.compareMode === true;
+    const engineA = req.body.engineA as VideoEngine | undefined;
+    const engineB = req.body.engineB as VideoEngine | undefined;
+
+    console.log(`📋 [API V2] Engine: ${videoEngine}, CompareMode: ${compareMode}`);
+    if (compareMode) {
+      console.log(`   🆚 Comparing: ${engineA} vs ${engineB}`);
+    }
+
+    const pipeline = new PipelineV2({
+      useMock: false,
+      verbose: true,
+      duration: 10,
+      language: 'ja',
+    });
+
+    // Check if requested engine is available
+    const availableEngines = pipeline.getAvailableEngines();
+    const singleEngines: VideoEngine[] = ['kling', 'heygen', 'seedance', 'veo3'];
+
+    if (singleEngines.includes(videoEngine) && !availableEngines.includes(videoEngine)) {
+      return res.status(400).json({
+        success: false,
+        error: `${videoEngine} engine is not available (API key not configured)`,
+        availableEngines,
+      });
+    }
+
+    // Handle comparison mode
+    let result;
+    if (compareMode && engineA && engineB) {
+      result = await pipeline.generateComparison(
+        {
+          imageBase64,
+          narrationText,
+          personImageBase64,
+          audioUrl,
+        },
+        engineA,
+        engineB
+      );
+    } else {
+      result = await pipeline.generate({
+        imageBase64,
+        videoEngine,
+        narrationText,
+        personImageBase64,
+        audioUrl,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // API: ヘルスチェック
 app.get('/api/health', (req, res) => {
   res.json({
@@ -321,6 +397,11 @@ app.get('/api/health', (req, res) => {
       gemini: !!process.env.GEMINI_API_KEY,
       openai: !!process.env.OPENAI_API_KEY,
       replicate: !!process.env.REPLICATE_API_TOKEN,
+      heygen: !!process.env.HEYGEN_API_KEY,
+      ark: !!process.env.ARK_API_KEY,
+    },
+    videoEngines: {
+      available: new PipelineV2().getAvailableEngines(),
     },
     timestamp: new Date().toISOString()
   });

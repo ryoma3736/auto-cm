@@ -1,0 +1,225 @@
+/**
+ * エンジン詳細カード専用スタイル
+ * Issue #48: エンジン詳細カード表示（特徴・料金・処理時間）
+ */
+
+/* エンジンカードコンテナ */
+.engine-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+  padding: 0;
+}
+
+/* 個別エンジンカード */
+.engine-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.engine-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  border-color: var(--engine-color, #667eea);
+}
+
+.engine-card.selected {
+  border-color: var(--engine-color, #667eea);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+}
+
+.engine-card.recommended::before {
+  content: '⭐おすすめ';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(255, 215, 0, 0.4);
+}
+
+/* カードヘッダー */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.engine-icon {
+  font-size: 28px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 10px;
+}
+
+.card-header h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.3;
+}
+
+.card-header .provider {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+/* 説明文 */
+.engine-card .description {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 12px;
+  line-height: 1.5;
+  min-height: 40px;
+}
+
+/* ベストユースケースタグ */
+.best-for {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.best-for .tag {
+  background: #f5f5f5;
+  color: #666;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.engine-card.selected .best-for .tag {
+  background: var(--engine-color, #667eea);
+  color: white;
+}
+
+/* メタ情報（時間・料金・品質） */
+.meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.meta-item .icon {
+  font-size: 18px;
+}
+
+.meta-item .value {
+  font-weight: 700;
+  color: #333;
+}
+
+.meta-item .label {
+  font-size: 10px;
+  color: #999;
+}
+
+/* 特徴バッジ */
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.features .feature {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  color: #2e7d32;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.features .feature::before {
+  content: '✓';
+  font-weight: 700;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .engine-cards-container {
+    grid-template-columns: 1fr;
+  }
+
+  .card-header h4 {
+    font-size: 14px;
+  }
+
+  .meta {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .meta-item {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.engine-card {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.engine-card:nth-child(1) { animation-delay: 0s; }
+.engine-card:nth-child(2) { animation-delay: 0.1s; }
+.engine-card:nth-child(3) { animation-delay: 0.2s; }
+.engine-card:nth-child(4) { animation-delay: 0.3s; }
+.engine-card:nth-child(5) { animation-delay: 0.4s; }

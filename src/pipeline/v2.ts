@@ -47,6 +47,11 @@ export interface PipelineV2Input {
   /** Video engine selection */
   videoEngine?: VideoEngine;
 
+  /** Comparison mode: select 2 specific engines (Issue #51) */
+  compareMode?: boolean;
+  engineA?: VideoEngine;
+  engineB?: VideoEngine;
+
   /** HeyGen talking photo ID (optional - uses preset if not provided) */
   talkingPhotoId?: string;
 
@@ -126,10 +131,10 @@ export class PipelineV2 {
   private visionAnalyzer: VisionAnalyzer;
   private scriptGenerator: ScriptGenerator;
   private imageProcessor: ImageProcessor;
-  private klingGenerator: VideoGenerator | null = null;
-  private heygenGenerator: HeyGenGenerator | null = null;
-  private seedanceGenerator: SeedanceGenerator | null = null;
-  private veo3Generator: Veo3Generator | null = null;
+  private _klingGenerator: VideoGenerator | null = null;
+  private _heygenGenerator: HeyGenGenerator | null = null;
+  private _seedanceGenerator: SeedanceGenerator | null = null;
+  private _veo3Generator: Veo3Generator | null = null;
   private voiceGenerator: VoiceGenerator;
   private personAnalyzer: PersonAnalyzer;
   private voiceCloner: VoiceCloner;
@@ -162,38 +167,8 @@ export class PipelineV2 {
       nanoBananaEndpoint: process.env.NANOBANANA_ENDPOINT || '',
     });
 
-    // Initialize Kling if available
-    if (process.env.REPLICATE_API_TOKEN) {
-      this.klingGenerator = new VideoGenerator({
-        replicateApiToken: process.env.REPLICATE_API_TOKEN,
-        useMock: options.useMock,
-      });
-      this.log('✓ Kling generator initialized');
-    }
-
-    // Initialize HeyGen if available
-    if (process.env.HEYGEN_API_KEY) {
-      this.heygenGenerator = new HeyGenGenerator({
-        apiKey: process.env.HEYGEN_API_KEY,
-      });
-      this.log('✓ HeyGen generator initialized');
-    }
-
-    // Initialize Seedance if available (BytePlus ModelArk)
-    if (process.env.ARK_API_KEY) {
-      this.seedanceGenerator = new SeedanceGenerator({
-        apiKey: process.env.ARK_API_KEY,
-      });
-      this.log('✓ Seedance generator initialized (BytePlus ModelArk)');
-    }
-
-    // Initialize Veo3 if available (Gemini API)
-    if (process.env.GEMINI_API_KEY) {
-      this.veo3Generator = new Veo3Generator({
-        apiKey: process.env.GEMINI_API_KEY,
-      });
-      this.log('✓ Veo3 generator initialized (Gemini API)');
-    }
+    // Lazy initialization for video generators (initialized on-demand)
+    // No longer initializing all engines upfront
 
     this.voiceGenerator = new VoiceGenerator({
       useMock: options.useMock,
@@ -212,6 +187,61 @@ export class PipelineV2 {
       geminiApiKey: process.env.GEMINI_API_KEY,
       verbose: options.verbose,
     });
+
+    this.log('✓ Pipeline V2 initialized with lazy loading');
+  }
+
+  /**
+   * Lazy getter for Kling generator
+   */
+  private getKlingGenerator(): VideoGenerator | null {
+    if (!this._klingGenerator && process.env.REPLICATE_API_TOKEN) {
+      this._klingGenerator = new VideoGenerator({
+        replicateApiToken: process.env.REPLICATE_API_TOKEN,
+        useMock: this.options.useMock,
+      });
+      this.log('✓ Kling generator initialized (lazy)');
+    }
+    return this._klingGenerator;
+  }
+
+  /**
+   * Lazy getter for HeyGen generator
+   */
+  private getHeygenGenerator(): HeyGenGenerator | null {
+    if (!this._heygenGenerator && process.env.HEYGEN_API_KEY) {
+      this._heygenGenerator = new HeyGenGenerator({
+        apiKey: process.env.HEYGEN_API_KEY,
+      });
+      this.log('✓ HeyGen generator initialized (lazy)');
+    }
+    return this._heygenGenerator;
+  }
+
+  /**
+   * Lazy getter for Seedance generator
+   */
+  private getSeedanceGenerator(): SeedanceGenerator | null {
+    if (!this._seedanceGenerator && process.env.ARK_API_KEY) {
+      this._seedanceGenerator = new SeedanceGenerator({
+        apiKey: process.env.ARK_API_KEY,
+      });
+      this.log('✓ Seedance generator initialized (lazy - BytePlus ModelArk)');
+    }
+    return this._seedanceGenerator;
+  }
+
+  /**
+   * Lazy getter for Veo3 generator
+   */
+  private getVeo3Generator(): Veo3Generator | null {
+    if (!this._veo3Generator && process.env.GEMINI_API_KEY) {
+      this._veo3Generator = new Veo3Generator({
+        apiKey: process.env.GEMINI_API_KEY,
+      });
+      this.log('✓ Veo3 generator initialized (lazy - Gemini API)');
+    }
+    return this._veo3Generator;
   }
 
   /**
@@ -365,7 +395,8 @@ export class PipelineV2 {
     const startTime = Date.now();
     this.log('   [Kling] Starting...');
 
-    if (!this.klingGenerator) {
+    const klingGenerator = this.getKlingGenerator();
+    if (!klingGenerator) {
       return {
         engine: 'kling',
         success: false,
@@ -383,7 +414,7 @@ Natural UGC style video, soft professional lighting.
 The presenter holds the product gently and turns it to show the label.
 Smooth natural movements, authentic style.`;
 
-      const result = await this.klingGenerator.generateAndWait({
+      const result = await klingGenerator.generateAndWait({
         firstFrameImage: resized.base64,
         prompt,
         duration: this.options.duration,
@@ -419,7 +450,8 @@ Smooth natural movements, authentic style.`;
     const startTime = Date.now();
     this.log('   [HeyGen] Starting...');
 
-    if (!this.heygenGenerator) {
+    const heygenGenerator = this.getHeygenGenerator();
+    if (!heygenGenerator) {
       return {
         engine: 'heygen',
         success: false,
@@ -433,7 +465,7 @@ Smooth natural movements, authentic style.`;
       const talkingPhotoId = input.talkingPhotoId || HEYGEN_PRESETS.japaneseWoman.talkingPhotoId;
       const voiceId = input.heygenVoiceId || HEYGEN_PRESETS.japaneseWoman.voiceId;
 
-      const result = await this.heygenGenerator.generateAndWait({
+      const result = await heygenGenerator.generateAndWait({
         talkingPhotoId,
         text: narrationText,
         voiceId,
@@ -470,7 +502,8 @@ Smooth natural movements, authentic style.`;
     const startTime = Date.now();
     this.log('   [Seedance] Starting...');
 
-    if (!this.seedanceGenerator) {
+    const seedanceGenerator = this.getSeedanceGenerator();
+    if (!seedanceGenerator) {
       return {
         engine: 'seedance',
         success: false,
@@ -485,7 +518,7 @@ Cinematic quality, smooth motion, vivid details.
 The presenter holds the product gently and turns it to show features.
 Natural UGC style, soft professional lighting.`;
 
-      const result = await this.seedanceGenerator.generateAndWait({
+      const result = await seedanceGenerator.generateAndWait({
         imageBase64,
         prompt,
         resolution: '720p',
@@ -522,7 +555,8 @@ Natural UGC style, soft professional lighting.`;
     const startTime = Date.now();
     this.log('   [Veo3] Starting...');
 
-    if (!this.veo3Generator) {
+    const veo3Generator = this.getVeo3Generator();
+    if (!veo3Generator) {
       return {
         engine: 'veo3',
         success: false,
@@ -538,7 +572,7 @@ Cinematic quality, smooth motion, professional lighting.
 The presenter holds the product gently and shows it naturally.
 UGC influencer style, vertical video format.`;
 
-      const result = await this.veo3Generator.generateAndWait({
+      const result = await veo3Generator.generateAndWait({
         imageBase64,
         prompt,
         model: 'veo-3.1-generate-preview',
@@ -668,16 +702,156 @@ UGC influencer style, vertical video format.`;
   }
 
   /**
-   * Get available engines
+   * Get available engines (based on environment variables)
    */
   getAvailableEngines(): VideoEngine[] {
     const engines: VideoEngine[] = [];
-    if (this.klingGenerator) engines.push('kling');
-    if (this.heygenGenerator) engines.push('heygen');
-    if (this.seedanceGenerator) engines.push('seedance');
-    if (this.veo3Generator) engines.push('veo3');
-    if (engines.length > 1) engines.push('all');
+    if (process.env.REPLICATE_API_TOKEN) engines.push('kling');
+    if (process.env.HEYGEN_API_KEY) engines.push('heygen');
+    if (process.env.ARK_API_KEY) engines.push('seedance');
+    if (process.env.GEMINI_API_KEY) engines.push('veo3');
+    if (engines.length > 1) {
+      engines.push('both'); // For backwards compatibility
+      engines.push('all');
+    }
     return engines;
+  }
+
+  /**
+   * Compare two specific engines (Issue #51)
+   */
+  async generateComparison(
+    input: PipelineV2Input,
+    engineA: VideoEngine,
+    engineB: VideoEngine
+  ): Promise<PipelineV2Result> {
+    const startTime = Date.now();
+    this.log('═══════════════════════════════════════════');
+    this.log('   Pipeline V2 - Comparison Mode');
+    this.log(`   Engine A: ${engineA} vs Engine B: ${engineB}`);
+    this.log('═══════════════════════════════════════════');
+
+    try {
+      // Load image
+      const imageBase64 = await this.loadImage(input);
+
+      // Get narration
+      const narrationText = input.narrationText || '';
+
+      // Generate composite if person image provided
+      let finalImageBase64 = imageBase64;
+      let compositeImage: string | undefined;
+
+      if (input.personImageBase64) {
+        this.log('\n📸 Generating composite image...');
+        const composite = await this.aiCompositor.generatePersonHoldingProduct({
+          personImageBase64: input.personImageBase64,
+          productImageBase64: imageBase64,
+          width: 720,
+          height: 1280,
+        });
+        finalImageBase64 = composite.base64;
+        compositeImage = composite.base64;
+        this.log(`   ✓ Composite generated (${composite.processingTime}ms)`);
+      }
+
+      // Run both engines in parallel
+      this.log('\n🎬 Starting comparison generation...');
+
+      const engineAPromise = this.generateSingleEngine(engineA, input, finalImageBase64, narrationText);
+      const engineBPromise = this.generateSingleEngine(engineB, input, finalImageBase64, narrationText);
+
+      const [resultA, resultB] = await Promise.allSettled([engineAPromise, engineBPromise]);
+
+      const videos: PipelineV2Result['videos'] = {};
+
+      if (resultA.status === 'fulfilled') {
+        videos[engineA as 'kling' | 'heygen' | 'seedance' | 'veo3'] = resultA.value;
+      } else {
+        videos[engineA as 'kling' | 'heygen' | 'seedance' | 'veo3'] = {
+          engine: engineA,
+          success: false,
+          error: resultA.reason?.message || 'Unknown error',
+          processingTime: 0,
+        };
+      }
+
+      if (resultB.status === 'fulfilled') {
+        videos[engineB as 'kling' | 'heygen' | 'seedance' | 'veo3'] = resultB.value;
+      } else {
+        videos[engineB as 'kling' | 'heygen' | 'seedance' | 'veo3'] = {
+          engine: engineB,
+          success: false,
+          error: resultB.reason?.message || 'Unknown error',
+          processingTime: 0,
+        };
+      }
+
+      // Find recommended (first successful or faster)
+      let recommended: VideoEngineResult | undefined;
+      const successfulEngines = Object.values(videos).filter(v => v?.success);
+      if (successfulEngines.length > 0) {
+        recommended = successfulEngines.sort((a, b) => a!.processingTime - b!.processingTime)[0];
+      }
+
+      const success = Object.values(videos).some(v => v?.success);
+
+      this.log('\n═══════════════════════════════════════════');
+      this.log('   Comparison Complete');
+      this.log(`   Success: ${success}`);
+      this.log(`   Total time: ${Math.floor((Date.now() - startTime) / 1000)}s`);
+      if (recommended) {
+        this.log(`   Recommended: ${recommended.engine} (${Math.floor(recommended.processingTime / 1000)}s)`);
+      }
+      this.log('═══════════════════════════════════════════');
+
+      return {
+        success,
+        videos,
+        compositeImage,
+        recommended,
+        metadata: {
+          totalProcessingTime: Date.now() - startTime,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        videos: {},
+        metadata: {
+          totalProcessingTime: Date.now() - startTime,
+        },
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Generate with a single specific engine
+   */
+  private async generateSingleEngine(
+    engine: VideoEngine,
+    input: PipelineV2Input,
+    imageBase64: string,
+    narrationText: string
+  ): Promise<VideoEngineResult> {
+    switch (engine) {
+      case 'kling':
+        return this.generateWithKling(imageBase64, narrationText);
+      case 'heygen':
+        return this.generateWithHeyGen(input, narrationText);
+      case 'seedance':
+        return this.generateWithSeedance(imageBase64, narrationText);
+      case 'veo3':
+        return this.generateWithVeo3(imageBase64, narrationText);
+      default:
+        return {
+          engine,
+          success: false,
+          error: `Unsupported engine: ${engine}`,
+          processingTime: 0,
+        };
+    }
   }
 
   /**
