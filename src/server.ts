@@ -308,6 +308,121 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
   }
 });
 
+// API: V2動画生成（複数エンジン対応）
+app.post('/api/generate-v2', upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'personImage', maxCount: 1 },
+  { name: 'voiceSample', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+    if (!files.image || !files.image[0]) {
+      return res.status(400).json({ success: false, error: '画像がアップロードされていません' });
+    }
+
+    const imageBase64 = files.image[0].buffer.toString('base64');
+    const personImageBase64 = files.personImage?.[0]?.buffer.toString('base64');
+    const voiceSampleBase64 = files.voiceSample?.[0]?.buffer.toString('base64');
+
+    const duration = parseInt(req.body.duration) || 5;
+    const language = req.body.language || 'ja';
+
+    // Parse selected engines (comma-separated string)
+    const videoEnginesStr = req.body.videoEngines || 'kling';
+    const selectedEngines = videoEnginesStr.split(',').filter((e: string) => e.trim());
+
+    console.log(`📋 [API V2] Duration: ${duration}s, Language: ${language}`);
+    console.log(`🎬 [API V2] Selected Engines: ${selectedEngines.join(', ')}`);
+
+    // Import PipelineV2 dynamically
+    const { PipelineV2 } = await import('./pipeline/v2.js');
+
+    const pipeline = new PipelineV2({
+      language: language as 'ja' | 'en' | 'zh',
+      duration,
+      useMock: false,
+      verbose: true,
+    });
+
+    // Generate videos for each selected engine in parallel
+    const enginePromises = selectedEngines.map(async (engine: string) => {
+      try {
+        const result = await pipeline.generate({
+          imageBase64,
+          personImageBase64,
+          voiceSampleBase64,
+          videoEngine: engine as 'kling' | 'heygen' | 'seedance' | 'veo3',
+        });
+        return { engine, result };
+      } catch (error) {
+        return {
+          engine,
+          result: {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            videos: {}
+          }
+        };
+      }
+    });
+
+    const results = await Promise.all(enginePromises);
+
+    // Aggregate results
+    const videos: Record<string, unknown> = {};
+    let metadata = {};
+    let compositeImage;
+
+    results.forEach(({ engine, result }) => {
+      if (result.videos && Object.keys(result.videos).length > 0) {
+        Object.assign(videos, result.videos);
+      } else if (result.success) {
+        videos[engine] = {
+          engine,
+          success: true,
+          videoUrl: result.videoUrl || result.videos?.[engine]?.videoUrl,
+          processingTime: result.metadata?.totalProcessingTime || 0,
+        };
+      } else {
+        videos[engine] = {
+          engine,
+          success: false,
+          error: result.error,
+          processingTime: 0,
+        };
+      }
+
+      if (result.metadata) {
+        metadata = result.metadata;
+      }
+      if (result.compositeImage) {
+        compositeImage = result.compositeImage;
+      }
+    });
+
+    // Find recommended engine (first successful)
+    const recommended = Object.values(videos).find((v: unknown) => (v as { success: boolean }).success);
+
+    res.json({
+      success: Object.values(videos).some((v: unknown) => (v as { success: boolean }).success),
+      videos,
+      compositeImage,
+      recommended,
+      metadata: {
+        ...metadata,
+        processingTime: (metadata as { totalProcessingTime?: number }).totalProcessingTime || 0,
+      },
+    });
+  } catch (error) {
+    console.error('Generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // API: ヘルスチェック
 app.get('/api/health', (req, res) => {
   res.json({

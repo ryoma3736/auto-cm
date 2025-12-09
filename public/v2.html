@@ -232,11 +232,12 @@
       border-color: #667eea;
       background: #f8f9ff;
     }
-    .engine-option input[type="radio"] {
+    .engine-option input[type="checkbox"] {
       margin: 4px 10px 0 0;
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
       cursor: pointer;
+      accent-color: #4CAF50;
     }
     .engine-option:has(input:checked) {
       border-color: #4CAF50;
@@ -579,13 +580,14 @@
     <input type="file" id="person-input" accept="image/png,image/jpeg">
     <input type="file" id="voice-input" accept="audio/mp3,audio/wav,audio/m4a,audio/*">
 
-    <!-- Engine Selector (Radio Button) -->
+    <!-- Engine Selector (Checkbox - Multiple Selection) -->
     <div class="engine-selector">
-      <h3>🎬 動画生成エンジンを選択</h3>
+      <h3>🎬 動画生成エンジンを選択 <span style="font-size: 12px; color: #666; font-weight: 400;">（複数選択可）</span></h3>
+      <p style="font-size: 12px; color: #888; margin-bottom: 15px;">選択したエンジン全てで動画を生成します</p>
 
       <div class="engine-options">
         <label class="engine-option">
-          <input type="radio" name="videoEngine" value="kling" checked>
+          <input type="checkbox" name="videoEngines" value="kling" checked>
           <div class="engine-card">
             <div class="engine-name">Kling v2.5<span class="badge">⭐おすすめ</span></div>
             <div class="engine-desc">モーション特化・商品動作に最適</div>
@@ -594,7 +596,7 @@
         </label>
 
         <label class="engine-option">
-          <input type="radio" name="videoEngine" value="heygen">
+          <input type="checkbox" name="videoEngines" value="heygen">
           <div class="engine-card">
             <div class="engine-name">HeyGen</div>
             <div class="engine-desc">リップシンク・話す人物向け</div>
@@ -603,7 +605,7 @@
         </label>
 
         <label class="engine-option">
-          <input type="radio" name="videoEngine" value="seedance">
+          <input type="checkbox" name="videoEngines" value="seedance">
           <div class="engine-card">
             <div class="engine-name">Seedance</div>
             <div class="engine-desc">シネマティック・映画風品質</div>
@@ -612,7 +614,7 @@
         </label>
 
         <label class="engine-option">
-          <input type="radio" name="videoEngine" value="veo3">
+          <input type="checkbox" name="videoEngines" value="veo3">
           <div class="engine-card">
             <div class="engine-name">Veo3</div>
             <div class="engine-desc">音声同時生成・ナレーション対応</div>
@@ -621,7 +623,7 @@
         </label>
 
         <label class="engine-option">
-          <input type="radio" name="videoEngine" value="sora2">
+          <input type="checkbox" name="videoEngines" value="sora2">
           <div class="engine-card">
             <div class="engine-name">Sora2</div>
             <div class="engine-desc">最高品質・OpenAI製</div>
@@ -630,10 +632,9 @@
         </label>
       </div>
 
-      <label class="compare-option">
-        <input type="checkbox" id="enableCompare">
-        2つのエンジンで比較生成する（オプション）
-      </label>
+      <div id="selected-count" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 8px; font-size: 13px; color: #555;">
+        📊 選択中: <strong id="engine-count">1</strong>エンジン
+      </div>
     </div>
 
     <!-- Settings -->
@@ -718,18 +719,33 @@
     const featBasic = document.getElementById('feat-basic');
     const featPerson = document.getElementById('feat-person');
     const featVoice = document.getElementById('feat-voice');
-    const enableCompare = document.getElementById('enableCompare');
+    const engineCountEl = document.getElementById('engine-count');
 
     // File storage
     let productFile = null;
     let personFile = null;
     let voiceFile = null;
 
-    // Get selected engine from radio buttons
-    function getSelectedEngine() {
-      const selected = document.querySelector('input[name="videoEngine"]:checked');
-      return selected ? selected.value : 'kling';
+    // Get selected engines from checkboxes (returns array)
+    function getSelectedEngines() {
+      const checkboxes = document.querySelectorAll('input[name="videoEngines"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
     }
+
+    // Update engine count display
+    function updateEngineCount() {
+      const count = getSelectedEngines().length;
+      engineCountEl.textContent = count;
+
+      // Disable generate button if no engine selected
+      const hasProduct = !!productFile;
+      generateBtn.disabled = !hasProduct || count === 0;
+    }
+
+    // Add event listeners to engine checkboxes
+    document.querySelectorAll('input[name="videoEngines"]').forEach(cb => {
+      cb.addEventListener('change', updateEngineCount);
+    });
 
     // Update auto mode status
     function updateAutoMode() {
@@ -846,10 +862,9 @@
       formData.append('duration', durationSelect.value);
       formData.append('language', languageSelect.value);
 
-      // Use radio button selection or "all" mode for comparison
-      const selectedEngine = getSelectedEngine();
-      const compareMode = enableCompare.checked;
-      formData.append('videoEngine', compareMode ? 'all' : selectedEngine);
+      // Send selected engines as comma-separated string
+      const selectedEngines = getSelectedEngines();
+      formData.append('videoEngines', selectedEngines.join(','));
 
       // V2: Auto-add person and voice if available
       if (personFile) formData.append('personImage', personFile);
@@ -912,40 +927,42 @@
             </div>
           ` : '';
 
-          // Dual engine results
+          // Video results from selected engines
           const videos = data.videos || {};
           const recommended = data.recommended;
-          const actualEngine = compareMode ? 'all' : getSelectedEngine();
+
+          // Engine display info
+          const engineInfo = {
+            kling: { name: 'Kling v2.5', icon: '🎬', desc: 'モーション' },
+            heygen: { name: 'HeyGen', icon: '🎤', desc: 'リップシンク' },
+            seedance: { name: 'Seedance', icon: '🎥', desc: 'シネマティック' },
+            veo3: { name: 'Veo3', icon: '🔊', desc: '音声付き' },
+            sora2: { name: 'Sora2', icon: '🌟', desc: '最高品質' },
+          };
 
           // Build video results HTML
           let videoResultsHtml = '';
+          const videoKeys = Object.keys(videos);
 
-          // If "all" engine selected, show comparison grid
-          if (actualEngine === 'all') {
-            const engines = [
-              { key: 'heygen', name: 'HeyGen', icon: '🎤', color: '#667eea', desc: 'リップシンク' },
-              { key: 'kling', name: 'Kling', icon: '🎬', color: '#f5a623', desc: 'モーション' },
-              { key: 'seedance', name: 'Seedance', icon: '🎥', color: '#38a169', desc: 'シネマティック' },
-              { key: 'veo3', name: 'Veo3', icon: '🔊', color: '#4285f4', desc: '音声付き' },
-            ];
+          if (videoKeys.length > 0) {
+            const gridCols = videoKeys.length === 1 ? '1fr' : 'repeat(2, 1fr)';
+            videoResultsHtml = `<h4 style="margin:15px 0 10px;">🎬 生成結果（${videoKeys.length}エンジン）</h4>
+            <div class="comparison-grid" style="grid-template-columns: ${gridCols};">`;
 
-            let gridHtml = '<h4 style="margin:15px 0 10px;">🚀 全エンジン比較結果</h4><div class="comparison-grid">';
-
-            engines.forEach(eng => {
-              const result = videos[eng.key];
-              if (!result) return;
-
-              const isRecommended = recommended?.engine === eng.key;
+            videoKeys.forEach(key => {
+              const result = videos[key];
+              const info = engineInfo[key] || { name: key, icon: '🎬', desc: '' };
+              const isRecommended = recommended?.engine === key;
               const statusClass = result.success ? (isRecommended ? 'success recommended' : 'success') : 'failed';
 
-              gridHtml += `
+              videoResultsHtml += `
                 <div class="engine-result-card ${statusClass}">
                   <h4>
-                    <span>${eng.icon}</span>
-                    <span>${eng.name}</span>
-                    <small style="color:#666;font-weight:normal;">${eng.desc}</small>
+                    <span>${info.icon}</span>
+                    <span>${info.name}</span>
+                    <small style="color:#666;font-weight:normal;">${info.desc}</small>
                     ${isRecommended ? '<span style="background:#ffd700;color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">推奨</span>' : ''}
-                    <span class="time-badge">${Math.floor(result.processingTime / 1000)}秒</span>
+                    <span class="time-badge">${Math.floor((result.processingTime || 0) / 1000)}秒</span>
                   </h4>
                   ${result.success ? `
                     <video controls src="${result.videoUrl}" style="width:100%;border-radius:8px;"></video>
@@ -960,81 +977,7 @@
               `;
             });
 
-            gridHtml += '</div>';
-            videoResultsHtml = gridHtml;
-          } else {
-            // Original individual engine display
-
-          if (videos.heygen) {
-            const hg = videos.heygen;
-            videoResultsHtml += `
-              <div class="video-url-container" style="border-left: 4px solid ${hg.success ? '#4caf50' : '#f44336'};">
-                <strong>🎤 HeyGen（リップシンク）:</strong>
-                ${hg.success ? `
-                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(hg.processingTime / 1000)}秒)</span>
-                  ${recommended?.engine === 'heygen' ? '<span style="background:#667eea;color:white;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
-                  <a href="${hg.videoUrl}" target="_blank">${hg.videoUrl}</a>
-                  <div class="video-actions">
-                    <button class="btn-copy" onclick="copyToClipboard('${hg.videoUrl}')">📋 コピー</button>
-                    <button class="btn-open" onclick="window.open('${hg.videoUrl}', '_blank')">🎥 再生</button>
-                  </div>
-                ` : `<span style="color: #f44336;">❌ 失敗: ${hg.error}</span>`}
-              </div>
-            `;
-          }
-
-          if (videos.kling) {
-            const kg = videos.kling;
-            videoResultsHtml += `
-              <div class="video-url-container" style="border-left: 4px solid ${kg.success ? '#4caf50' : '#f44336'}; margin-top: 10px;">
-                <strong>🎬 Kling（モーション）:</strong>
-                ${kg.success ? `
-                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(kg.processingTime / 1000)}秒)</span>
-                  ${recommended?.engine === 'kling' ? '<span style="background:#667eea;color:white;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
-                  <a href="${kg.videoUrl}" target="_blank">${kg.videoUrl}</a>
-                  <div class="video-actions">
-                    <button class="btn-copy" onclick="copyToClipboard('${kg.videoUrl}')">📋 コピー</button>
-                    <button class="btn-open" onclick="window.open('${kg.videoUrl}', '_blank')">🎥 再生</button>
-                  </div>
-                ` : `<span style="color: #f44336;">❌ 失敗: ${kg.error}</span>`}
-              </div>
-            `;
-          }
-
-          if (videos.seedance) {
-            const sd = videos.seedance;
-            videoResultsHtml += `
-              <div class="video-url-container" style="border-left: 4px solid ${sd.success ? '#ffd700' : '#f44336'}; margin-top: 10px;">
-                <strong>🎥 Seedance（シネマティック）:</strong>
-                ${sd.success ? `
-                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(sd.processingTime / 1000)}秒)</span>
-                  ${recommended?.engine === 'seedance' ? '<span style="background:#ffd700;color:#000;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
-                  <a href="${sd.videoUrl}" target="_blank">${sd.videoUrl}</a>
-                  <div class="video-actions">
-                    <button class="btn-copy" onclick="copyToClipboard('${sd.videoUrl}')">📋 コピー</button>
-                    <button class="btn-open" onclick="window.open('${sd.videoUrl}', '_blank')">🎥 再生</button>
-                  </div>
-                ` : `<span style="color: #f44336;">❌ 失敗: ${sd.error}</span>`}
-              </div>
-            `;
-          }
-
-          if (videos.veo3) {
-            const v3 = videos.veo3;
-            videoResultsHtml += `
-              <div class="video-url-container" style="border-left: 4px solid ${v3.success ? '#4285f4' : '#f44336'}; margin-top: 10px;">
-                <strong>🔊 Veo3（音声付き・Google）:</strong>
-                ${v3.success ? `
-                  <span style="color: #4caf50;">✅ 成功 (${Math.floor(v3.processingTime / 1000)}秒)</span>
-                  ${recommended?.engine === 'veo3' ? '<span style="background:#4285f4;color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:5px;">推奨</span>' : ''}
-                  <a href="${v3.videoUrl}" target="_blank">${v3.videoUrl}</a>
-                  <div class="video-actions">
-                    <button class="btn-copy" onclick="copyToClipboard('${v3.videoUrl}')">📋 コピー</button>
-                    <button class="btn-open" onclick="window.open('${v3.videoUrl}', '_blank')">🎥 再生</button>
-                  </div>
-                ` : `<span style="color: #f44336;">❌ 失敗: ${v3.error}</span>`}
-              </div>
-            `;
+            videoResultsHtml += '</div>';
           }
 
           // Fallback for single video URL
@@ -1051,7 +994,6 @@
               </div>
             `;
           }
-          } // Close else block for non-"all" engine
 
           resultContent.innerHTML = `
             <p><strong>商品タイプ:</strong> ${productType}</p>
