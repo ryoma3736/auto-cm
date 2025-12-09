@@ -7,12 +7,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { hello } from '../src/index.js';
+import { AdGenerationPipeline, createPipeline } from '../src/pipeline/index.js';
 
 describe('auto-cm', () => {
-  it('should return greeting message', () => {
-    const result = hello();
-    expect(result).toBe('Hello from auto-cm!');
+  it('should create pipeline instance', () => {
+    const pipeline = createPipeline({ useMock: true });
+    expect(pipeline).toBeInstanceOf(AdGenerationPipeline);
   });
 
   it('should handle basic math', () => {

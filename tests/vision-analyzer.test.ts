@@ -127,7 +127,7 @@ describe('VisionAnalyzer', () => {
       expect(result).toEqual(mockValidResponse);
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-4o',
+          model: 'gpt-5',
           response_format: { type: 'json_object' },
           messages: expect.arrayContaining([
             expect.objectContaining({

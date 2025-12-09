@@ -52,15 +52,20 @@ describe('ScriptGenerator', () => {
     });
 
     it('should throw error when no API key provided', () => {
-      // Remove environment variable
-      const originalKey = process.env.OPENAI_API_KEY;
+      // Remove environment variables
+      const originalOpenAIKey = process.env.OPENAI_API_KEY;
+      const originalGeminiKey = process.env.GEMINI_API_KEY;
       delete process.env.OPENAI_API_KEY;
+      delete process.env.GEMINI_API_KEY;
 
-      expect(() => new ScriptGenerator()).toThrow('ScriptGenerator requires OPENAI_API_KEY');
+      expect(() => new ScriptGenerator()).toThrow('ScriptGenerator requires GEMINI_API_KEY or OPENAI_API_KEY');
 
-      // Restore environment variable
-      if (originalKey) {
-        process.env.OPENAI_API_KEY = originalKey;
+      // Restore environment variables
+      if (originalOpenAIKey) {
+        process.env.OPENAI_API_KEY = originalOpenAIKey;
+      }
+      if (originalGeminiKey) {
+        process.env.GEMINI_API_KEY = originalGeminiKey;
       }
     });
 
