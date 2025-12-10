@@ -154,10 +154,11 @@ export class VideoGenerator {
       input.input_reference = imageData;
     }
 
-    // Pass OpenAI API key if available for direct billing
-    if (this.openaiApiKey) {
-      input.openai_api_key = this.openaiApiKey;
-    }
+    // Note: Not passing openai_api_key - using Replicate credits instead
+    // If you want to use your own OpenAI API key, uncomment:
+    // if (this.openaiApiKey) {
+    //   input.openai_api_key = this.openaiApiKey;
+    // }
 
     try {
       // Log the request for debugging

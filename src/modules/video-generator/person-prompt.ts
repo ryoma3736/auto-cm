@@ -6,6 +6,7 @@
 import type { PersonProfile } from '../person-analyzer/index.js';
 import type { ProductAnalysis } from '../image-analyzer/index.js';
 import type { UGCScript } from '../script-generator/index.js';
+import type { TalentProfile } from '../talent-profiler/index.js';
 
 /**
  * Person video generation request
@@ -21,6 +22,8 @@ export interface PersonVideoRequest {
   duration: number;
   /** Language code */
   language: 'ja' | 'en' | 'zh';
+  /** Optional talent profile from TalentProfiler */
+  talentProfile?: TalentProfile;
 }
 
 /**
@@ -41,10 +44,13 @@ export interface EnhancedPromptResult {
  * Generate person-aware Sora2 prompt
  */
 export function generatePersonPrompt(request: PersonVideoRequest): EnhancedPromptResult {
-  const { personProfile, productAnalysis, script, language } = request;
+  const { personProfile, productAnalysis, script, language, talentProfile } = request;
 
   // Build person description
-  const personDescription = buildPersonDescription(personProfile, language);
+  // Use talentProfile if available, otherwise use personProfile
+  const personDescription = talentProfile
+    ? generateTalentPrompt(talentProfile)
+    : buildPersonDescription(personProfile, language);
 
   // Build scene-specific prompts
   const scenePrompts = script.scenes.map((scene, index) => {
@@ -69,6 +75,14 @@ export function generatePersonPrompt(request: PersonVideoRequest): EnhancedPromp
     scenePrompts,
     cameraMovements,
   };
+}
+
+/**
+ * Generate talent-specific prompt from TalentProfile
+ */
+function generateTalentPrompt(talentProfile: TalentProfile): string {
+  const { appearance } = talentProfile;
+  return `A Japanese woman resembling ${talentProfile.name} with ${appearance.faceType}, ${appearance.hairStyle} hair, ${appearance.bodyType} build, wearing ${appearance.fashionStyle} style clothing. ${talentProfile.videoPromptHints}`;
 }
 
 /**
@@ -155,7 +169,7 @@ function buildMainPrompt(params: {
   cameraMovements: string[];
   language: 'ja' | 'en' | 'zh';
 }): string {
-  const { personDescription, productAnalysis, script, cameraMovements, language } = params;
+  const { personDescription, productAnalysis, cameraMovements } = params;
 
   // Always use English for Sora2 prompt (best results)
   const productColors = productAnalysis.colors.join(', ');
@@ -180,8 +194,9 @@ export function mergeWithScriptPrompt(
     return originalScriptPrompt;
   }
 
-  // Enhance the original prompt with person details
-  const enhanced = `${personPromptResult.prompt} Original concept: ${originalScriptPrompt.substring(0, 200)}`;
+  // If talent profile was used, prioritize talent characteristics at the beginning
+  // Otherwise, enhance the original prompt with person details
+  const enhanced = `${personPromptResult.personDescription} ${personPromptResult.prompt} Original concept: ${originalScriptPrompt.substring(0, 200)}`;
 
   return enhanced.substring(0, 1000); // Sora2 prompt limit
 }

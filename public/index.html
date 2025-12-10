@@ -73,6 +73,154 @@
       border-color: #667eea;
     }
 
+    /* Custom Prompt */
+    .custom-prompt-group {
+      margin-bottom: 20px;
+    }
+    .custom-prompt-group label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    .custom-prompt-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+      transition: border-color 0.3s;
+    }
+    .custom-prompt-group textarea:hover {
+      border-color: #667eea;
+    }
+    .custom-prompt-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .custom-prompt-group .hint {
+      font-size: 11px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    /* Mode Selection */
+    .mode-selection {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+    .mode-selection-label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    .mode-options {
+      display: flex;
+      gap: 10px;
+    }
+    .mode-option {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: white;
+    }
+    .mode-option:hover {
+      border-color: #667eea;
+    }
+    .mode-option.selected {
+      border-color: #667eea;
+      background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+    }
+    .mode-option input {
+      display: none;
+    }
+    .mode-option-title {
+      font-weight: 600;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .mode-option-desc {
+      font-size: 12px;
+      color: #666;
+    }
+    .mode-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: normal;
+    }
+    .mode-badge-v1 {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+    .mode-badge-v2 {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    /* V2 Product Details Form */
+    .product-details {
+      display: none;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #fff3e0;
+      border-radius: 10px;
+      border: 2px solid #ffcc80;
+    }
+    .product-details.show {
+      display: block;
+    }
+    .product-details-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #f57c00;
+    }
+    .product-field {
+      margin-bottom: 12px;
+    }
+    .product-field label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .product-field input,
+    .product-field textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.3s;
+    }
+    .product-field input:focus,
+    .product-field textarea:focus {
+      outline: none;
+      border-color: #f57c00;
+    }
+    .product-field textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    .product-field .required {
+      color: #e53935;
+    }
+
     .btn {
       width: 100%;
       padding: 15px;
@@ -155,6 +303,52 @@
     </div>
     <input type="file" id="file-input" accept="image/png,image/jpeg">
 
+    <!-- Mode Selection -->
+    <div class="mode-selection">
+      <label class="mode-selection-label">🎯 生成モード選択</label>
+      <div class="mode-options">
+        <label class="mode-option selected" id="mode-v1">
+          <input type="radio" name="mode" value="v1" checked>
+          <div class="mode-option-title">
+            V1 <span class="mode-badge mode-badge-v1">自由度高</span>
+          </div>
+          <div class="mode-option-desc">
+            抽象的なプロンプトでOK。「こんなCMがいい」程度の指示で動画を生成します。
+          </div>
+        </label>
+        <label class="mode-option" id="mode-v2">
+          <input type="radio" name="mode" value="v2">
+          <div class="mode-option-title">
+            V2 <span class="mode-badge mode-badge-v2">具体寄せ</span>
+          </div>
+          <div class="mode-option-desc">
+            商品詳細を入力して、より正確な広告を生成。画像だけでは伝わらない情報を補完します。
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- V2 Product Details (hidden by default) -->
+    <div class="product-details" id="product-details">
+      <div class="product-details-title">📦 商品詳細情報（V2モード）</div>
+      <div class="product-field">
+        <label>商品名 <span class="required">*</span></label>
+        <input type="text" id="product-name" placeholder="例: モイスチャーヘアオイル">
+      </div>
+      <div class="product-field">
+        <label>商品の特徴・効果</label>
+        <textarea id="product-features" placeholder="例: 髪のダメージを補修し、サラサラの仕上がりに。天然オイル配合で髪に優しい。"></textarea>
+      </div>
+      <div class="product-field">
+        <label>ターゲット層</label>
+        <input type="text" id="target-audience" placeholder="例: 20-30代女性、髪のパサつきが気になる方">
+      </div>
+      <div class="product-field">
+        <label>訴求ポイント</label>
+        <textarea id="selling-points" placeholder="例: 1本で髪がツヤツヤに！朝のスタイリングが楽になる。"></textarea>
+      </div>
+    </div>
+
     <!-- Settings -->
     <div class="settings">
       <div class="setting-group">
@@ -173,6 +367,13 @@
           <option value="zh">中文</option>
         </select>
       </div>
+    </div>
+
+    <!-- Custom Prompt -->
+    <div class="custom-prompt-group">
+      <label>✨ カスタムプロンプト（任意）</label>
+      <textarea id="custom-prompt" placeholder="例: 商品を手に持って笑顔で紹介する感じにして&#10;例: 高級感のある雰囲気で、背景はシンプルに&#10;例: かわいい感じで、ピンク系の色調で"></textarea>
+      <p class="hint">動画の雰囲気や演出の指示を自由に入力できます。空欄の場合は自動で最適化されます。</p>
     </div>
 
     <button class="btn btn-primary" id="generate-btn" disabled>🚀 広告動画を生成</button>
@@ -202,8 +403,34 @@
     const resultContent = document.getElementById('result-content');
     const durationSelect = document.getElementById('duration-select');
     const languageSelect = document.getElementById('language-select');
+    const customPromptInput = document.getElementById('custom-prompt');
+
+    // Mode selection elements
+    const modeV1 = document.getElementById('mode-v1');
+    const modeV2 = document.getElementById('mode-v2');
+    const productDetails = document.getElementById('product-details');
+    const productNameInput = document.getElementById('product-name');
+    const productFeaturesInput = document.getElementById('product-features');
+    const targetAudienceInput = document.getElementById('target-audience');
+    const sellingPointsInput = document.getElementById('selling-points');
 
     let selectedFile = null;
+    let selectedMode = 'v1';
+
+    // Mode selection logic
+    modeV1.addEventListener('click', () => {
+      selectedMode = 'v1';
+      modeV1.classList.add('selected');
+      modeV2.classList.remove('selected');
+      productDetails.classList.remove('show');
+    });
+
+    modeV2.addEventListener('click', () => {
+      selectedMode = 'v2';
+      modeV2.classList.add('selected');
+      modeV1.classList.remove('selected');
+      productDetails.classList.add('show');
+    });
 
     uploadArea.addEventListener('click', () => fileInput.click());
     uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
@@ -248,10 +475,36 @@
         item.querySelector('.progress-icon').textContent = '⏳';
       });
 
+      // V2 mode validation
+      if (selectedMode === 'v2') {
+        const productName = productNameInput.value.trim();
+        if (!productName) {
+          alert('V2モードでは商品名の入力が必須です');
+          generateBtn.disabled = false;
+          progress.classList.remove('show');
+          return;
+        }
+      }
+
       const formData = new FormData();
       formData.append('image', selectedFile);
       formData.append('duration', durationSelect.value);
       formData.append('language', languageSelect.value);
+      formData.append('mode', selectedMode);
+
+      // Add custom prompt
+      const customPromptValue = customPromptInput.value.trim();
+      if (customPromptValue) {
+        formData.append('customPrompt', customPromptValue);
+      }
+
+      // Add V2 product details
+      if (selectedMode === 'v2') {
+        formData.append('productName', productNameInput.value.trim());
+        formData.append('productFeatures', productFeaturesInput.value.trim());
+        formData.append('targetAudience', targetAudienceInput.value.trim());
+        formData.append('sellingPoints', sellingPointsInput.value.trim());
+      }
 
       try {
         const response = await fetch('/api/generate', { method: 'POST', body: formData });

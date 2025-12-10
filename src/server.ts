@@ -3,6 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { AdGenerationPipeline } from './pipeline/index.js';
+import { TalentProfiler } from './modules/talent-profiler/index.js';
 
 const app = express();
 const PORT = 8888;
@@ -273,6 +274,14 @@ app.get('/old', (req, res) => {
 });
 */
 
+// Product details interface for V2 mode
+interface ProductDetails {
+  productName: string;
+  features?: string;
+  targetAudience?: string;
+  sellingPoints?: string;
+}
+
 // API: 動画生成
 app.post('/api/generate', upload.single('image'), async (req, res) => {
   try {
@@ -283,15 +292,42 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
     const imageBase64 = req.file.buffer.toString('base64');
     const duration = parseInt(req.body.duration) || 12;
     const language = req.body.language || 'ja';
+    const customPrompt = req.body.customPrompt || undefined;
+    const mode = (req.body.mode as 'v1' | 'v2') || 'v1';
 
-    console.log(`📋 [API] Duration: ${duration}s, Language: ${language}`);
+    // V2 mode: Parse product details
+    let productDetails: ProductDetails | undefined;
+    if (mode === 'v2') {
+      const productName = req.body.productName;
+      if (!productName) {
+        return res.status(400).json({ success: false, error: 'V2モードでは商品名が必須です' });
+      }
+      productDetails = {
+        productName,
+        features: req.body.productFeatures || undefined,
+        targetAudience: req.body.targetAudience || undefined,
+        sellingPoints: req.body.sellingPoints || undefined,
+      };
+    }
+
+    const useMock = process.env.USE_MOCK === 'true';
+    console.log(`📋 [API] Mode: ${mode}, Duration: ${duration}s, Language: ${language}, Mock: ${useMock}`);
+    if (customPrompt) {
+      console.log(`📝 [API] Custom Prompt: ${customPrompt.substring(0, 50)}...`);
+    }
+    if (productDetails) {
+      console.log(`📦 [API] V2 Product: ${productDetails.productName}`);
+    }
 
     const pipeline = new AdGenerationPipeline({
-      useMock: false, // 本番APIを使用（Gemini Vision + Nano Banana Pro）
-      mockVideoOnly: !process.env.REPLICATE_API_TOKEN, // Replicate APIトークンがあればSora 2使用
+      useMock, // USE_MOCK=true で全APIをモック
+      mockVideoOnly: !useMock && !process.env.REPLICATE_API_TOKEN, // モックでなくReplicate APIトークンがなければ動画のみモック
       verbose: true,
       duration,
       language,
+      customPrompt,
+      mode,
+      productDetails,
     });
 
     const result = await pipeline.generate({
@@ -301,6 +337,79 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// API: V2 タレント起用対応 (JSON mode)
+app.post('/api/v2/generate', async (req, res) => {
+  try {
+    const { imageBase64, talentName, duration, language } = req.body;
+
+    // Validate required fields
+    if (!imageBase64) {
+      return res.status(400).json({
+        success: false,
+        error: '画像データ (imageBase64) が必要です'
+      });
+    }
+
+    // Validate talentName format
+    if (talentName && typeof talentName !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'タレント名が不正です。文字列を指定してください'
+      });
+    }
+
+    const finalDuration = parseInt(duration as string) || 12;
+    const finalLanguage = (language as string) || 'ja';
+
+    const useMock = process.env.USE_MOCK === 'true';
+    console.log(`📋 [API V2] Duration: ${finalDuration}s, Language: ${finalLanguage}, Mock: ${useMock}`);
+
+    // Generate talent profile if talentName is provided
+    let talentProfile;
+    if (talentName) {
+      console.log(`🎭 [API V2] Generating profile for talent: ${talentName}`);
+      try {
+        const profiler = new TalentProfiler({
+          geminiApiKey: process.env.GEMINI_API_KEY,
+          useMock
+        });
+        talentProfile = await profiler.generateProfile(talentName, finalLanguage);
+        console.log(`✅ [API V2] Talent profile generated: ${talentProfile.name}`);
+      } catch (error) {
+        console.error(`❌ [API V2] Talent profile generation failed:`, error);
+        return res.status(500).json({
+          success: false,
+          error: `タレントプロフィール生成に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+      }
+    }
+
+    // Initialize pipeline with talent mode
+    const pipeline = new AdGenerationPipeline({
+      useMock,
+      mockVideoOnly: !useMock && !process.env.REPLICATE_API_TOKEN,
+      verbose: true,
+      duration: finalDuration,
+      language: finalLanguage as 'ja' | 'en' | 'zh',
+      useTalent: !!talentName,
+    });
+
+    // Execute pipeline
+    const result = await pipeline.generate({
+      imageBase64,
+      talentName,
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[API V2] Generation error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -327,22 +436,27 @@ app.post('/api/generate-v2', upload.fields([
 
     const duration = parseInt(req.body.duration) || 5;
     const language = req.body.language || 'ja';
+    const customPrompt = req.body.customPrompt || undefined;
 
     // Parse selected engines (comma-separated string)
     const videoEnginesStr = req.body.videoEngines || 'kling';
     const selectedEngines = videoEnginesStr.split(',').filter((e: string) => e.trim());
 
-    console.log(`📋 [API V2] Duration: ${duration}s, Language: ${language}`);
+    const useMock = process.env.USE_MOCK === 'true';
+    console.log(`📋 [API V2] Duration: ${duration}s, Language: ${language}, Mock: ${useMock}`);
     console.log(`🎬 [API V2] Selected Engines: ${selectedEngines.join(', ')}`);
+    if (customPrompt) {
+      console.log(`📝 [API V2] Custom Prompt: ${customPrompt.substring(0, 50)}...`);
+    }
 
     // Import PipelineV2 dynamically
     const { PipelineV2 } = await import('./pipeline/v2.js');
-
     const pipeline = new PipelineV2({
       language: language as 'ja' | 'en' | 'zh',
       duration,
-      useMock: false,
+      useMock, // USE_MOCK=true で全APIをモック
       verbose: true,
+      customPrompt,
     });
 
     // Generate videos for each selected engine in parallel

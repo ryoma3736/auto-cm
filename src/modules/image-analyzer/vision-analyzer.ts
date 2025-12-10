@@ -51,11 +51,11 @@ export interface VisionAnalyzerOptions {
   claudeApiKey?: string;
   /** Google Gemini API key (preferred) */
   geminiApiKey?: string;
-  /** OpenAI model to use (default: gpt-5) */
+  /** OpenAI model to use (default: gpt-5.1) */
   openaiModel?: string;
-  /** Claude model to use (default: claude-3-5-sonnet-20241022) */
+  /** Claude model to use (default: claude-sonnet-4-5-20250929) */
   claudeModel?: string;
-  /** Gemini model to use (default: gemini-2.0-flash-exp) */
+  /** Gemini model to use (default: gemini-3-pro-preview) - best multimodal, beats GPT-5 Pro */
   geminiModel?: string;
   /** Maximum retry attempts on failure */
   maxRetries?: number;
@@ -71,12 +71,12 @@ export interface VisionAnalyzerOptions {
  * Default configuration
  */
 const DEFAULT_OPTIONS: Required<Omit<VisionAnalyzerOptions, 'openaiApiKey' | 'claudeApiKey' | 'geminiApiKey'>> = {
-  openaiModel: 'gpt-5',
-  claudeModel: 'claude-3-5-sonnet-20241022',
+  openaiModel: 'gpt-5.1',
+  claudeModel: 'claude-sonnet-4-5-20250929',
   geminiModel: 'gemini-3-pro-preview',
   maxRetries: 3,
   useClaudePrimary: false,
-  useGeminiPrimary: true, // Gemini 3 Pro for vision (best multimodal)
+  useGeminiPrimary: true, // Gemini 3 Pro - best multimodal, outperforms GPT-5 Pro in 19/20 benchmarks
   useMock: false,
 };
 

@@ -204,6 +204,39 @@
       outline: none;
     }
 
+    /* Custom Prompt */
+    .custom-prompt-group {
+      margin-bottom: 20px;
+    }
+    .custom-prompt-group label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    .custom-prompt-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+      transition: border-color 0.3s;
+    }
+    .custom-prompt-group textarea:hover,
+    .custom-prompt-group textarea:focus {
+      border-color: #667eea;
+      outline: none;
+    }
+    .custom-prompt-group .hint {
+      font-size: 11px;
+      color: #999;
+      margin-top: 5px;
+    }
+
     /* Engine Selector (Radio Button) */
     .engine-selector {
       margin-bottom: 20px;
@@ -656,6 +689,13 @@
       </div>
     </div>
 
+    <!-- Custom Prompt -->
+    <div class="custom-prompt-group">
+      <label>✨ カスタムプロンプト（任意）</label>
+      <textarea id="custom-prompt" placeholder="例: 商品を手に持って笑顔で紹介する感じにして&#10;例: 高級感のある雰囲気で、背景はシンプルに&#10;例: かわいい感じで、ピンク系の色調で"></textarea>
+      <p class="hint">動画の雰囲気や演出の指示を自由に入力できます。空欄の場合は自動で最適化されます。</p>
+    </div>
+
     <!-- Feature Summary -->
     <div class="feature-summary">
       <h4>有効な機能（オート検出）</h4>
@@ -714,6 +754,7 @@
     const resultContent = document.getElementById('result-content');
     const durationSelect = document.getElementById('duration-select');
     const languageSelect = document.getElementById('language-select');
+    const customPromptInput = document.getElementById('custom-prompt');
     const autoStatus = document.getElementById('auto-status');
     const autoDescription = document.getElementById('auto-description');
     const featBasic = document.getElementById('feat-basic');
@@ -861,6 +902,12 @@
       formData.append('image', productFile);
       formData.append('duration', durationSelect.value);
       formData.append('language', languageSelect.value);
+
+      // Custom prompt (optional)
+      const customPromptValue = customPromptInput.value.trim();
+      if (customPromptValue) {
+        formData.append('customPrompt', customPromptValue);
+      }
 
       // Send selected engines as comma-separated string
       const selectedEngines = getSelectedEngines();

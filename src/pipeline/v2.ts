@@ -69,6 +69,8 @@ export interface PipelineV2Options {
   useMock?: boolean;
   /** Verbose logging */
   verbose?: boolean;
+  /** Custom prompt from user for video generation direction */
+  customPrompt?: string;
 }
 
 export interface VideoEngineResult {
@@ -155,6 +157,7 @@ export class PipelineV2 {
     this.scriptGenerator = new ScriptGenerator({
       useMock: options.useMock,
       language: options.language || 'ja',
+      customPrompt: options.customPrompt,
     });
 
     this.imageProcessor = new ImageProcessor({

@@ -31,6 +31,8 @@ import { DriveStorage, type VideoFile } from '../modules/storage/index.js';
 // V2 imports
 import { PersonAnalyzer, type PersonProfile } from '../modules/person-analyzer/index.js';
 import { VoiceCloner } from '../modules/voice-cloner/index.js';
+// V2: Talent casting (module not implemented yet)
+// import { TalentProfiler } from '../modules/talent-profiler/index.js';
 
 // ========== Pipeline Interfaces ==========
 
@@ -50,6 +52,8 @@ export interface PipelineInput {
   personImageBase64?: string;
   /** Voice sample in Base64 for cloning (V2 feature) */
   voiceSampleBase64?: string;
+  /** Talent name (V2 feature) - Example: "新垣結衣" */
+  talentName?: string;
 }
 
 export interface PipelineResult {
@@ -85,6 +89,14 @@ export interface StageResult {
   error?: string;
 }
 
+/** Product details for V2 mode */
+export interface ProductDetails {
+  productName: string;
+  features?: string;
+  targetAudience?: string;
+  sellingPoints?: string;
+}
+
 export interface PipelineOptions {
   /** OpenAI API key (for Vision + Script generation) */
   openaiApiKey?: string;
@@ -101,9 +113,17 @@ export interface PipelineOptions {
   duration?: number;
   /** Script language (ja, en, zh) */
   language?: 'ja' | 'en' | 'zh';
+  /** Custom prompt from user for video generation direction */
+  customPrompt?: string;
+  /** Generation mode: v1 (flexible, abstract OK) or v2 (product-focused, detailed) */
+  mode?: 'v1' | 'v2';
+  /** Product details for V2 mode */
+  productDetails?: ProductDetails;
   // V2 options
   /** ElevenLabs API key for voice cloning */
   elevenLabsApiKey?: string;
+  /** Use talent casting mode (V2 feature) */
+  useTalent?: boolean;
 }
 
 // ========== Main Pipeline Class ==========
@@ -130,6 +150,8 @@ export class AdGenerationPipeline {
   // V2 modules
   private personAnalyzer: PersonAnalyzer;
   private voiceCloner: VoiceCloner;
+  // V2: Talent casting (not implemented yet)
+  // private talentProfiler: TalentProfiler;
 
   constructor(options: PipelineOptions = {}) {
     this.options = {
@@ -150,6 +172,9 @@ export class AdGenerationPipeline {
       apiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
       useMock: options.useMock,
       language: options.language || 'ja',
+      customPrompt: options.customPrompt,
+      mode: options.mode || 'v1',
+      productDetails: options.productDetails,
     });
 
     this.imageProcessor = new ImageProcessor({
@@ -191,6 +216,11 @@ export class AdGenerationPipeline {
       openaiApiKey: options.openaiApiKey || process.env.OPENAI_API_KEY,
       useMock: options.useMock,
     });
+
+    // V2: Initialize TalentProfiler (not implemented yet)
+    // this.talentProfiler = new TalentProfiler({
+    //   useMock: options.useMock,
+    // });
   }
 
   /**

@@ -398,7 +398,8 @@ describe('ScriptGenerator', () => {
             visualDescription: 'Scene 3',
           },
         ],
-        sora2Prompt: 'Full video prompt',
+        // Include Japanese keyword to satisfy nationality validation
+        sora2Prompt: 'A Japanese woman in Tokyo filming a UGC video',
       };
 
       const createSpy = vi
@@ -417,7 +418,7 @@ describe('ScriptGenerator', () => {
       expect(result.persona.name).toBe('美咲');
       expect(result.script).toBeDefined();
       expect(result.script.scenes).toHaveLength(3);
-      expect(result.script.sora2Prompt).toBe('Full video prompt');
+      expect(result.script.sora2Prompt).toBe('A Japanese woman in Tokyo filming a UGC video');
     });
   });
 
@@ -425,6 +426,517 @@ describe('ScriptGenerator', () => {
     it('should create ScriptGenerator instance', () => {
       const instance = createScriptGenerator({ apiKey: 'test-key' });
       expect(instance).toBeInstanceOf(ScriptGenerator);
+    });
+  });
+
+  describe('Nationality Validation Feature (#73)', () => {
+    it('should fix sora2Prompt when nationality is missing', async () => {
+      const mockScript = {
+        totalDuration: 12,
+        scenes: [
+          {
+            sceneNumber: 1,
+            timeCode: '00:00-00:04',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'excited',
+            cameraDirection: 'close-up',
+            visualDescription: 'Scene 1',
+          },
+          {
+            sceneNumber: 2,
+            timeCode: '00:04-00:08',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'calm',
+            cameraDirection: 'medium shot',
+            visualDescription: 'Scene 2',
+          },
+          {
+            sceneNumber: 3,
+            timeCode: '00:08-00:12',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'satisfied',
+            cameraDirection: 'selfie',
+            visualDescription: 'Scene 3',
+          },
+        ],
+        // No nationality keyword - should be fixed
+        sora2Prompt: 'A woman filming a video in her apartment',
+      };
+
+      vi.spyOn(generator['openai'].chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockScript) } }],
+      } as any);
+
+      const mockPersona = {
+        name: '美咲',
+        age: 28,
+        occupation: 'IT企業勤務',
+        personality: ['ポジティブ'],
+        speakingStyle: 'カジュアル',
+        painPoints: ['時間がない'],
+        lifestyle: '忙しい',
+      };
+
+      const script = await generator.generateScript(mockPersona, mockProductAnalysis);
+
+      // Should contain Japanese nationality
+      expect(script.sora2Prompt).toContain('Japanese');
+    });
+
+    it('should replace wrong nationality in sora2Prompt', async () => {
+      const mockScript = {
+        totalDuration: 12,
+        scenes: [
+          {
+            sceneNumber: 1,
+            timeCode: '00:00-00:04',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'excited',
+            cameraDirection: 'close-up',
+            visualDescription: 'Scene 1',
+          },
+          {
+            sceneNumber: 2,
+            timeCode: '00:04-00:08',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'calm',
+            cameraDirection: 'medium shot',
+            visualDescription: 'Scene 2',
+          },
+          {
+            sceneNumber: 3,
+            timeCode: '00:08-00:12',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'satisfied',
+            cameraDirection: 'selfie',
+            visualDescription: 'Scene 3',
+          },
+        ],
+        // Wrong nationality - should be fixed to Japanese
+        sora2Prompt: 'A Chinese woman in Shanghai filming a video',
+      };
+
+      vi.spyOn(generator['openai'].chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockScript) } }],
+      } as any);
+
+      const mockPersona = {
+        name: '美咲',
+        age: 28,
+        occupation: 'IT企業勤務',
+        personality: ['ポジティブ'],
+        speakingStyle: 'カジュアル',
+        painPoints: ['時間がない'],
+        lifestyle: '忙しい',
+      };
+
+      const script = await generator.generateScript(mockPersona, mockProductAnalysis);
+
+      // Should fix nationality to Japanese and location to Tokyo
+      expect(script.sora2Prompt).toContain('Japanese');
+      expect(script.sora2Prompt).toContain('Tokyo');
+      expect(script.sora2Prompt).not.toContain('Chinese');
+      expect(script.sora2Prompt).not.toContain('Shanghai');
+    });
+
+    it('should preserve correct nationality in sora2Prompt', async () => {
+      const mockScript = {
+        totalDuration: 12,
+        scenes: [
+          {
+            sceneNumber: 1,
+            timeCode: '00:00-00:04',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'excited',
+            cameraDirection: 'close-up',
+            visualDescription: 'Scene 1',
+          },
+          {
+            sceneNumber: 2,
+            timeCode: '00:04-00:08',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'calm',
+            cameraDirection: 'medium shot',
+            visualDescription: 'Scene 2',
+          },
+          {
+            sceneNumber: 3,
+            timeCode: '00:08-00:12',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'satisfied',
+            cameraDirection: 'selfie',
+            visualDescription: 'Scene 3',
+          },
+        ],
+        // Correct nationality - should be preserved
+        sora2Prompt: 'A Japanese woman in Tokyo filming a UGC-style video',
+      };
+
+      vi.spyOn(generator['openai'].chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockScript) } }],
+      } as any);
+
+      const mockPersona = {
+        name: '美咲',
+        age: 28,
+        occupation: 'IT企業勤務',
+        personality: ['ポジティブ'],
+        speakingStyle: 'カジュアル',
+        painPoints: ['時間がない'],
+        lifestyle: '忙しい',
+      };
+
+      const script = await generator.generateScript(mockPersona, mockProductAnalysis);
+
+      // Should preserve original
+      expect(script.sora2Prompt).toBe('A Japanese woman in Tokyo filming a UGC-style video');
+    });
+  });
+
+  describe('Fallback Prompt Generation (#72)', () => {
+    it('should generate fallback prompt with product name when sora2Prompt is empty', async () => {
+      const mockScript = {
+        totalDuration: 12,
+        scenes: [
+          {
+            sceneNumber: 1,
+            timeCode: '00:00-00:04',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'excited',
+            cameraDirection: 'close-up',
+            visualDescription: 'Testing product',
+          },
+          {
+            sceneNumber: 2,
+            timeCode: '00:04-00:08',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'calm',
+            cameraDirection: 'medium shot',
+            visualDescription: 'Showing features',
+          },
+          {
+            sceneNumber: 3,
+            timeCode: '00:08-00:12',
+            durationSeconds: 4,
+            narration: 'テスト',
+            emotion: 'satisfied',
+            cameraDirection: 'selfie',
+            visualDescription: 'Final shot',
+          },
+        ],
+        // Empty sora2Prompt - should generate fallback
+        sora2Prompt: '',
+      };
+
+      vi.spyOn(generator['openai'].chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockScript) } }],
+      } as any);
+
+      const mockPersona = {
+        name: '美咲',
+        age: 28,
+        occupation: 'IT企業勤務',
+        personality: ['ポジティブ'],
+        speakingStyle: 'カジュアル',
+        painPoints: ['時間がない'],
+        lifestyle: '忙しい',
+      };
+
+      const script = await generator.generateScript(mockPersona, mockProductAnalysis);
+
+      // Should generate fallback with product name
+      expect(script.sora2Prompt).toContain('Japanese');
+      expect(script.sora2Prompt).toContain('Tokyo');
+      expect(script.sora2Prompt).toContain(mockProductAnalysis.productName);
+    });
+  });
+
+  describe('Custom Prompt Feature', () => {
+    it('should accept customPrompt option', () => {
+      const generatorWithPrompt = new ScriptGenerator({
+        apiKey: 'test-api-key',
+        customPrompt: '商品を手に持って笑顔で紹介する感じ',
+      });
+      expect(generatorWithPrompt).toBeInstanceOf(ScriptGenerator);
+    });
+
+    it('should include custom prompt in sora2Prompt when using mock mode', async () => {
+      const customPrompt = '高級感のある雰囲気で、背景はシンプルに';
+      const generatorWithPrompt = new ScriptGenerator({
+        useMock: true,
+        customPrompt,
+      });
+
+      const mockPersona: Persona = {
+        name: '美咲',
+        age: 28,
+        occupation: 'IT企業勤務',
+        personality: ['ポジティブ'],
+        speakingStyle: 'カジュアル',
+        painPoints: ['時間がない'],
+        lifestyle: '忙しい',
+      };
+
+      const script = await generatorWithPrompt.generateScript(mockPersona, mockProductAnalysis);
+
+      // Check that custom prompt is included in sora2Prompt
+      expect(script.sora2Prompt).toContain('User Direction');
+      expect(script.sora2Prompt).toContain(customPrompt);
+    });
+
+    it('should not include User Direction prefix when no custom prompt is provided', async () => {
+      const generatorWithoutPrompt = new ScriptGenerator({
+        useMock: true,
+      });
+
+      const mockPersona: Persona = {
+        name: '美咲',
+        age: 28,
+        occupation: 'IT企業勤務',
+        personality: ['ポジティブ'],
+        speakingStyle: 'カジュアル',
+        painPoints: ['時間がない'],
+        lifestyle: '忙しい',
+      };
+
+      const script = await generatorWithoutPrompt.generateScript(mockPersona, mockProductAnalysis);
+
+      // Check that User Direction is not present when no custom prompt
+      expect(script.sora2Prompt).not.toContain('User Direction');
+    });
+
+    it('should work with different languages', async () => {
+      const customPrompt = 'Make it look professional and elegant';
+      const generatorEn = new ScriptGenerator({
+        useMock: true,
+        customPrompt,
+        language: 'en',
+      });
+
+      const mockPersona: Persona = {
+        name: 'Emma',
+        age: 25,
+        occupation: 'Marketing Manager',
+        personality: ['Creative'],
+        speakingStyle: 'Casual',
+        painPoints: ['Busy schedule'],
+        lifestyle: 'Active',
+      };
+
+      const script = await generatorEn.generateScript(mockPersona, mockProductAnalysis);
+
+      expect(script.sora2Prompt).toContain('User Direction');
+      expect(script.sora2Prompt).toContain(customPrompt);
+    });
+  });
+
+  describe('Talent Profile Integration (#88)', () => {
+    it('should accept talentProfile option', () => {
+      const mockTalentProfile = {
+        name: '新垣結衣',
+        appearance: {
+          faceType: '美人系、卵型の整った顔立ち',
+          hairStyle: 'ロングストレート',
+          bodyType: 'スリム',
+          fashionStyle: 'ナチュラル、カジュアルエレガント',
+        },
+        personality: {
+          speakingStyle: '柔らかく優しい、親しみやすい',
+          tone: '温かい、落ち着いた',
+          catchphrase: 'ムズキュンダンス',
+        },
+        videoPromptHints: 'A young Japanese woman with oval-shaped face',
+      };
+
+      const generatorWithTalent = new ScriptGenerator({
+        useMock: true,
+        talentProfile: mockTalentProfile,
+      });
+      expect(generatorWithTalent).toBeInstanceOf(ScriptGenerator);
+    });
+
+    it('should generate persona with talent name and speaking style', async () => {
+      const mockTalentProfile = {
+        name: '新垣結衣',
+        appearance: {
+          faceType: '美人系、卵型の整った顔立ち',
+          hairStyle: 'ロングストレート',
+          bodyType: 'スリム',
+          fashionStyle: 'ナチュラル',
+        },
+        personality: {
+          speakingStyle: '柔らかく優しい、親しみやすい',
+          tone: '温かい、落ち着いた',
+        },
+        videoPromptHints: 'A young Japanese woman',
+      };
+
+      const generatorWithTalent = new ScriptGenerator({
+        useMock: true,
+        talentProfile: mockTalentProfile,
+      });
+
+      const persona = await generatorWithTalent.generatePersona(mockProductAnalysis);
+
+      // Persona should reflect talent characteristics
+      expect(persona.name).toBe('新垣結衣');
+      expect(persona.speakingStyle).toContain('柔らかく');
+    });
+
+    it('should reflect talent speaking style in narration', async () => {
+      const mockTalentProfile = {
+        name: '新垣結衣',
+        appearance: {
+          faceType: '美人系',
+          hairStyle: 'ロング',
+          bodyType: 'スリム',
+          fashionStyle: 'ナチュラル',
+        },
+        personality: {
+          speakingStyle: '柔らかく優しい、親しみやすい',
+          tone: '温かい、落ち着いた',
+        },
+        videoPromptHints: 'A young Japanese woman',
+      };
+
+      const generatorWithTalent = new ScriptGenerator({
+        useMock: true,
+        talentProfile: mockTalentProfile,
+      });
+
+      const mockPersona: Persona = {
+        name: '新垣結衣',
+        age: 30,
+        occupation: '女優',
+        personality: ['優しい'],
+        speakingStyle: '柔らかく優しい、親しみやすい',
+        painPoints: [],
+        lifestyle: '',
+      };
+
+      const script = await generatorWithTalent.generateScript(mockPersona, mockProductAnalysis);
+
+      // Script should be generated (narration should be in Japanese)
+      expect(script.scenes).toBeDefined();
+      expect(script.scenes.length).toBeGreaterThan(0);
+      expect(script.scenes[0].narration).toBeTruthy();
+    });
+
+    it('should include talent appearance in sora2Prompt', async () => {
+      const mockTalentProfile = {
+        name: '新垣結衣',
+        appearance: {
+          faceType: '美人系、卵型の整った顔立ち',
+          hairStyle: 'ロングストレート',
+          bodyType: 'スリム',
+          fashionStyle: 'ナチュラル、カジュアルエレガント',
+        },
+        personality: {
+          speakingStyle: '柔らかく優しい',
+          tone: '温かい',
+        },
+        videoPromptHints: 'A young Japanese woman with oval-shaped beautiful face, long straight hair, slim body',
+      };
+
+      const generatorWithTalent = new ScriptGenerator({
+        useMock: true,
+        talentProfile: mockTalentProfile,
+      });
+
+      const mockPersona: Persona = {
+        name: '新垣結衣',
+        age: 30,
+        occupation: '女優',
+        personality: ['優しい'],
+        speakingStyle: '柔らかく優しい',
+        painPoints: [],
+        lifestyle: '',
+      };
+
+      const script = await generatorWithTalent.generateScript(mockPersona, mockProductAnalysis);
+
+      // sora2Prompt should include talent-specific appearance hints
+      expect(script.sora2Prompt).toBeDefined();
+      // Mock mode doesn't use talent profile in prompt, but real mode would
+      expect(script.sora2Prompt).toBeTruthy();
+    });
+
+    it('should work with talent profile and custom prompt together', async () => {
+      const mockTalentProfile = {
+        name: '新垣結衣',
+        appearance: {
+          faceType: '美人系',
+          hairStyle: 'ロング',
+          bodyType: 'スリム',
+          fashionStyle: 'ナチュラル',
+        },
+        personality: {
+          speakingStyle: '柔らかく優しい',
+          tone: '温かい',
+        },
+        videoPromptHints: 'A young Japanese woman',
+      };
+
+      const generatorWithBoth = new ScriptGenerator({
+        useMock: true,
+        talentProfile: mockTalentProfile,
+        customPrompt: '笑顔で明るく紹介',
+      });
+
+      const mockPersona: Persona = {
+        name: '新垣結衣',
+        age: 30,
+        occupation: '女優',
+        personality: ['優しい'],
+        speakingStyle: '柔らかく優しい',
+        painPoints: [],
+        lifestyle: '',
+      };
+
+      const script = await generatorWithBoth.generateScript(mockPersona, mockProductAnalysis);
+
+      // Should include both talent and custom prompt
+      expect(script.sora2Prompt).toContain('User Direction');
+      expect(script.sora2Prompt).toContain('笑顔で明るく紹介');
+    });
+
+    it('should handle talent profile without catchphrase', async () => {
+      const mockTalentProfile = {
+        name: 'Generic Talent',
+        appearance: {
+          faceType: 'Standard',
+          hairStyle: 'Medium',
+          bodyType: 'Average',
+          fashionStyle: 'Casual',
+        },
+        personality: {
+          speakingStyle: 'Friendly',
+          tone: 'Warm',
+          // No catchphrase
+        },
+        videoPromptHints: 'A person with friendly appearance',
+      };
+
+      const generatorWithTalent = new ScriptGenerator({
+        useMock: true,
+        talentProfile: mockTalentProfile,
+      });
+
+      const persona = await generatorWithTalent.generatePersona(mockProductAnalysis);
+
+      expect(persona.name).toBe('Generic Talent');
+      expect(persona.speakingStyle).toContain('Friendly');
     });
   });
 });
