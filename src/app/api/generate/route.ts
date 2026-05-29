@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getEngine, isEngineLive } from "@/lib/engines";
 import type { EngineId, GenerateParams } from "@/lib/engines/types";
-import { createJob, type EngineRun, type Job } from "@/lib/jobs/store";
+import { createJob, rollupStatus, type EngineRun, type Job } from "@/lib/jobs/store";
 import { persistUpload } from "@/lib/blob";
 import { env } from "@/lib/env";
 
@@ -73,13 +73,19 @@ export async function POST(req: Request) {
       };
       try {
         const sub = await engine.submit(params);
-        runs[id] = {
-          engine: id,
-          providerId: sub.providerId,
-          pollMode: sub.pollMode,
-          status: "processing",
-          ...(isEngineLive(id) ? {} : { progress: 100 }),
-        };
+        // Mock/demo engines resolve instantly — settle them inline so the flow works even
+        // without a persistent KV store (serverless in-memory does not survive invocations).
+        if (!isEngineLive(id)) {
+          const result = await engine.poll(sub.providerId);
+          runs[id] = { engine: id, providerId: sub.providerId, pollMode: "poll", ...result };
+        } else {
+          runs[id] = {
+            engine: id,
+            providerId: sub.providerId,
+            pollMode: sub.pollMode,
+            status: "processing",
+          };
+        }
       } catch (e) {
         runs[id] = { engine: id, status: "failed", error: String(e) };
       }
@@ -95,6 +101,7 @@ export async function POST(req: Request) {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+  job.status = rollupStatus(job);
   await createJob(job);
 
   return NextResponse.json({ jobId, job });
