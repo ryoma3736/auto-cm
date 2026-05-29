@@ -1,0 +1,36 @@
+project:
+  name: auto-cm
+  display_name: AutoCM Studio
+  description: AI広告動画生成スタジオ — 商品画像からプロ品質CMを自動生成
+  type: web
+  framework: nextjs
+  version: 1.0.0
+
+stack:
+  language: typescript
+  framework: next@16
+  ui: tailwind-v4 + shadcn/ui (base-nova)
+  animation: motion/react
+  deploy_target: vercel
+
+deploy:
+  provider: vercel
+  prod_url: https://auto-cm.vercel.app
+  infra:
+    job_store: vercel-kv (upstash redis)
+    media_store: vercel-blob
+
+engines:
+  - sora2     # OpenAI Sora 2 via Replicate
+  - veo3      # Google Veo 3 via Gemini API
+  - kling     # Kling v2.5 via Replicate
+  - seedance  # ByteDance Seedance via ModelArk
+  - heygen    # HeyGen talking-photo lip-sync
+
+coordinator_agent:
+  max_parallel_tasks: 5
+
+quality:
+  typescript_errors: 0
+  wcag_level: AA
+  brand_compliant: true   # no purple-on-white gradient, no Inter/Roboto/Arial

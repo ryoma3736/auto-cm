@@ -1,0 +1,37 @@
+version: "1.0.0"
+source: "docs/requirements/design-requirements.md"
+
+aesthetic:
+  direction: cinematic-premium
+  mood: confident, warm, filmic
+  differentiation: "映画スタジオの暗室 × 温かいアンバーの光。CM制作の高揚感を、紫グラデのAI slopを排して表現。"
+  default_theme: dark
+
+colors:
+  # oklch (Tailwind v4 tokens — globals.css と一致)
+  brand: "oklch(0.8 0.16 68)"        # amber accent
+  brand_foreground: "oklch(0.18 0.02 60)"
+  background_dark: "oklch(0.145 0 0)"
+  foreground_dark: "oklch(0.985 0 0)"
+  # 禁止: 紫グラデ on 白背景 / Inter・Roboto・Arial
+
+typography:
+  heading: { family: "Sora", weights: [500, 600, 700] }
+  body: { family: "Geist", fallback: "system-ui, sans-serif" }
+  mono: { family: "Geist Mono" }
+  features: ["text-balance(見出し)", "tabular-nums(数値)"]
+
+components:
+  library: "shadcn/ui (base-nova, base-ui)"
+  styling: "tailwind v4"
+  animation: "motion/react (transform/opacity, ~180ms)"
+  icons: "lucide-react"
+
+responsive:
+  mobile_first: true
+  breakpoints: { sm: 640px, md: 768px, lg: 1024px }
+
+quality:
+  lighthouse: { performance: 90, accessibility: 100 }
+  wcag_level: "AA"
+  dark_mode: true
