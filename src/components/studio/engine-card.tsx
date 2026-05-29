@@ -26,8 +26,8 @@ export function EngineCard({ info, selected, recommended, live, onToggle }: Prop
       className={cn(
         "relative flex w-full flex-col gap-3 rounded-xl border p-4 text-left transition-colors",
         selected
-          ? "border-brand bg-brand/10 ring-1 ring-brand"
-          : "border-border bg-card hover:border-brand/50",
+          ? "border-primary bg-primary/10 ring-1 ring-primary"
+          : "border-border bg-card hover:border-primary/50",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -35,7 +35,7 @@ export function EngineCard({ info, selected, recommended, live, onToggle }: Prop
           <div className="flex items-center gap-2">
             <h3 className="truncate font-heading text-base font-semibold">{info.name}</h3>
             {recommended && (
-              <Badge className="bg-brand text-brand-foreground hover:bg-brand">
+              <Badge className="bg-primary text-primary-foreground hover:bg-primary">
                 <Sparkles className="mr-1 size-3" /> 推奨
               </Badge>
             )}
@@ -45,7 +45,7 @@ export function EngineCard({ info, selected, recommended, live, onToggle }: Prop
         <span
           className={cn(
             "flex size-5 shrink-0 items-center justify-center rounded-full border",
-            selected ? "border-brand bg-brand text-brand-foreground" : "border-muted-foreground/40",
+            selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40",
           )}
         >
           {selected && <Check className="size-3.5" />}
@@ -59,7 +59,7 @@ export function EngineCard({ info, selected, recommended, live, onToggle }: Prop
           {Array.from({ length: 5 }).map((_, i) => (
             <Star
               key={i}
-              className={cn("size-3", i < info.quality ? "fill-brand text-brand" : "text-muted-foreground/30")}
+              className={cn("size-3", i < info.quality ? "fill-primary text-primary" : "text-muted-foreground/30")}
             />
           ))}
         </span>
