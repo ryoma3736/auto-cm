@@ -1,153 +1,56 @@
-# auto-cm
+# AutoCM Studio 🎬
 
-Autonomous development powered by **Miyabi** - AI-driven development framework.
+**商品画像1枚から、プロ品質のCM動画を自動生成。** Next.js + Vercel で動く AI 広告動画生成スタジオ。
 
-## Getting Started
+アップロード → AIが商品を解析し台本を生成 → エンジンを選んで生成・比較・ダウンロード。
 
-### Prerequisites
+## エンジン
+| Engine | Provider | 特徴 |
+|--------|----------|------|
+| Sora 2 | OpenAI (Replicate) | 最高品質・フォトリアル |
+| Veo 3 | Google (Gemini API) | 音声同時生成 |
+| Kling v2.5 | Kuaishou (Replicate) | モーション特化 |
+| Seedance 1.0 | ByteDance (ModelArk) | シネマティック・低コスト |
+| HeyGen | HeyGen | リップシンク（人物） |
 
+## 技術スタック
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · shadcn/ui · motion/react
+· Vercel KV (ジョブ状態) · Vercel Blob (メディア)
+
+## アーキテクチャ
+動画生成は 30–300 秒かかるため、**非同期ジョブモデル**で Vercel のタイムアウトを回避:
+`POST /api/generate` が各プロバイダの非同期APIをキックして即返却 → クライアントが
+`GET /api/jobs/[id]` をポーリング（Replicate は webhook 併用）→ 完了動画を Blob に永続化。
+詳細は [`docs/design/spec.md`](docs/design/spec.md)。
+
+## ローカル開発
 ```bash
-# Set environment variables
-cp .env.example .env
-# Edit .env and add your tokens
+pnpm install
+cp .env.example .env.local   # キーを設定（未設定ならデモモードで動作）
+pnpm dev                     # http://localhost:3000
+# デモモード（サンプル動画で全フロー体験）:
+MOCK_ENGINES=1 pnpm dev
 ```
 
-### Installation
-
+## デプロイ (Vercel)
 ```bash
-npm install
+vercel link
+vercel deploy --prod
 ```
+本番では Project Settings → Environment Variables にキーを設定。最低限 `GEMINI_API_KEY` と
+`REPLICATE_API_TOKEN`。永続ジョブ/メディアには Vercel KV (Upstash) と Vercel Blob を有効化。
 
-### Development
-
-```bash
-npm run dev          # Run development server
-npm run build        # Build project
-npm test             # Run tests
-npm run typecheck    # Check types
-npm run lint         # Lint code
+## ディレクトリ
 ```
-
-## Project Structure
-
+src/
+  app/            ルート + API (analyze / generate / jobs / webhooks)
+  components/     studio/* (UI) + ui/* (shadcn)
+  lib/
+    engines/      統一エンジン契約 + 各プロバイダアダプタ
+    pipeline/     Gemini 解析 + 台本生成
+    jobs/         KV ジョブストア
+_legacy/          旧 Express + 静的HTML 実装（移植参照用）
 ```
-auto-cm/
-├── src/                        # Source code
-│   ├── index.ts               # Entry point
-│   ├── config/                # Configuration files
-│   │   ├── default.ts         # Default config
-│   │   └── google-drive-credentials.example.json
-│   ├── modules/               # Core modules
-│   │   ├── image-analyzer/    # GPT-4 Vision image analysis
-│   │   ├── script-generator/  # Movie script generation
-│   │   ├── image-processor/   # Image processing (Sharp + NanoBanana)
-│   │   ├── video-generator/   # Video generation (Sora2)
-│   │   └── storage/           # Google Drive storage
-│   ├── pipeline/              # Orchestration pipeline
-│   └── utils/                 # Utility functions
-├── tests/                     # Test files
-│   └── example.test.ts
-├── .claude/                   # AI agent configuration
-│   ├── agents/                # Agent definitions
-│   └── commands/              # Custom commands
-├── .github/
-│   ├── workflows/             # CI/CD automation
-│   └── labels.yml             # Label system (53 labels)
-├── CLAUDE.md                  # AI context file
-└── package.json
-```
-
-## Miyabi Framework
-
-This project uses **7 autonomous AI agents**:
-
-1. **CoordinatorAgent** - Task planning & orchestration
-2. **IssueAgent** - Automatic issue analysis & labeling
-3. **CodeGenAgent** - AI-powered code generation
-4. **ReviewAgent** - Code quality validation (80+ score)
-5. **PRAgent** - Automatic PR creation
-6. **DeploymentAgent** - CI/CD deployment automation
-7. **TestAgent** - Test execution & coverage
-
-### Workflow
-
-1. **Create Issue**: Describe what you want to build
-2. **Agents Work**: AI agents analyze, implement, test
-3. **Review PR**: Check generated pull request
-4. **Merge**: Automatic deployment
-
-### Label System
-
-Issues transition through states automatically:
-
-- `📥 state:pending` - Waiting for agent assignment
-- `🔍 state:analyzing` - Being analyzed
-- `🏗️ state:implementing` - Code being written
-- `👀 state:reviewing` - Under review
-- `✅ state:done` - Completed & merged
-
-## Commands
-
-```bash
-# Check project status
-npx miyabi status
-
-# Watch for changes (real-time)
-npx miyabi status --watch
-
-# Create new issue
-gh issue create --title "Add feature" --body "Description"
-```
-
-## Configuration
-
-### Environment Variables
-
-Required variables (see `.env.example`):
-
-**Miyabi Framework:**
-- `GITHUB_TOKEN` - GitHub personal access token
-- `ANTHROPIC_API_KEY` - Claude API key (for AI agents)
-- `REPOSITORY` - Format: `owner/repo`
-
-**Movie Creation System:**
-- `OPENAI_API_KEY` - OpenAI API key (GPT-4 Vision)
-- `NANOBANANA_API_KEY` - NanoBanana API key (image processing)
-- `SORA2_API_KEY` - Sora2 API key (video generation)
-- `GOOGLE_DRIVE_CREDENTIALS` - Google Drive service account credentials path
-
-### GitHub Actions
-
-Workflows are pre-configured in `.github/workflows/`:
-
-- CI/CD pipeline
-- Automated testing
-- Deployment automation
-- Agent execution triggers
-
-**Note**: Set repository secrets at:
-`https://github.com/ryoma3736/auto-cm/settings/secrets/actions`
-
-Required secrets:
-- `GITHUB_TOKEN` (auto-provided by GitHub Actions)
-- `ANTHROPIC_API_KEY` (add manually for agent execution)
-
-## Documentation
-
-- **Miyabi Framework**: https://github.com/ShunsukeHayashi/Miyabi
-- **NPM Package**: https://www.npmjs.com/package/miyabi
-- **Label System**: See `.github/labels.yml`
-- **Agent Operations**: See `CLAUDE.md`
-
-## Support
-
-- **Issues**: https://github.com/ShunsukeHayashi/Miyabi/issues
-- **Discord**: [Coming soon]
-
-## License
-
-MIT
 
 ---
-
-✨ Generated by [Miyabi](https://github.com/ShunsukeHayashi/Miyabi)
+旧 Miyabi テンプレ実装からの再構築 (v1.0.0)。CCAGI SDK 管理。

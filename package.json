@@ -1,54 +1,45 @@
 {
   "name": "auto-cm",
-  "version": "0.1.0",
-  "description": "Sora2 Automatic Advertisement Generation System",
-  "type": "module",
-  "bin": {
-    "auto-cm": "./dist/index.js"
-  },
+  "version": "1.0.0",
+  "private": true,
+  "description": "AutoCM Studio — AI advertisement video generator (Next.js + Vercel)",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "build": "tsc",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:pipeline": "vitest run tests/pipeline.test.ts",
-    "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts",
-    "cli": "tsx src/index.ts"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [
-    "agentic-os",
-    "autonomous",
-    "sora2",
-    "advertisement",
-    "ai",
-    "video-generation"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@base-ui/react": "^1.5.0",
     "@google/generative-ai": "^0.24.1",
-    "@types/express": "^5.0.6",
-    "@types/multer": "^2.0.0",
-    "axios": "^1.7.9",
-    "commander": "^14.0.2",
-    "dotenv": "^16.4.7",
-    "express": "^5.2.1",
-    "googleapis": "^144.0.0",
-    "multer": "^2.0.2",
-    "openai": "^4.77.3",
+    "@upstash/redis": "^1.38.0",
+    "@vercel/blob": "^2.4.0",
+    "axios": "^1.16.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.17.0",
+    "motion": "^12.40.0",
+    "next": "16.2.6",
+    "next-themes": "^0.4.6",
+    "openai": "^6.39.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "replicate": "^1.4.0",
-    "sharp": "^0.33.5"
+    "shadcn": "^4.8.3",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.13.0",
-    "@typescript-eslint/parser": "^6.13.0",
-    "eslint": "^8.54.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
