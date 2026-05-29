@@ -58,10 +58,10 @@ export function Dropzone({ previewUrl, onFile, onClear }: Props) {
       }}
       className={cn(
         "flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition-colors",
-        dragging ? "border-brand bg-brand/10" : "border-border hover:border-brand/60 hover:bg-muted/40",
+        dragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/60 hover:bg-muted/40",
       )}
     >
-      <span className="flex size-14 items-center justify-center rounded-full bg-brand/15 text-brand">
+      <span className="flex size-14 items-center justify-center rounded-full bg-primary/15 text-primary">
         <ImagePlus className="size-7" />
       </span>
       <span className="font-medium">商品画像をアップロード</span>

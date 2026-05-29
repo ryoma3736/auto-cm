@@ -330,7 +330,7 @@ function ResultCard({ run, aspect }: { run: EngineRun; aspect: AspectRatio }) {
       >
         {pending && (
           <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <Loader2 className="size-6 animate-spin text-brand" />
+            <Loader2 className="size-6 animate-spin text-primary" />
             <span className="text-xs">生成中… ({info.estimatedTime})</span>
           </div>
         )}
@@ -359,7 +359,7 @@ function ResultCard({ run, aspect }: { run: EngineRun; aspect: AspectRatio }) {
 function StatusBadge({ status }: { status: EngineRun["status"] }) {
   const map = {
     pending: { label: "待機", cls: "bg-muted text-muted-foreground" },
-    processing: { label: "生成中", cls: "bg-brand/15 text-brand" },
+    processing: { label: "生成中", cls: "bg-primary/15 text-primary" },
     succeeded: { label: "完成", cls: "bg-green-500/15 text-green-500" },
     failed: { label: "失敗", cls: "bg-destructive/15 text-destructive" },
   }[status];
@@ -380,7 +380,7 @@ function StepBar({ step }: { step: Step }) {
           <span
             className={cn(
               "flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors tabular-nums",
-              i <= idx ? "bg-brand text-brand-foreground" : "bg-muted text-muted-foreground",
+              i <= idx ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
             )}
           >
             {i + 1}
@@ -438,8 +438,8 @@ function ChoiceGroup<T extends string | number>({
             className={cn(
               "rounded-md border px-2 py-1.5 text-xs transition-colors",
               value === o.v
-                ? "border-brand bg-brand/10 text-foreground"
-                : "border-border text-muted-foreground hover:border-brand/50",
+                ? "border-primary bg-primary/10 text-foreground"
+                : "border-border text-muted-foreground hover:border-primary/50",
             )}
           >
             {o.label}
