@@ -1,36 +1,40 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Lightweight CSS/SVG mascot placeholder — stands in for the 3D character art.
- * Swap `src` later to drop in a real PNG/SVG without touching layout.
+ * 3D mascot renderer. Shows a glossy 3D PNG (Fluent 3D set for now; swap to bespoke
+ * Gemini-generated characters by replacing the file under /public/3d). Optional soft
+ * colored "pedestal" backdrop matches the reference design's character tiles.
  */
 export function Mascot({
-  className,
   src,
+  className,
+  backdrop = false,
   hue = 255,
-  emoji = "🤖",
 }: {
+  src: string;
   className?: string;
-  src?: string;
+  backdrop?: boolean;
   hue?: number;
-  emoji?: string;
 }) {
-  if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" aria-hidden className={cn("object-contain", className)} />;
-  }
   return (
-    <div
-      aria-hidden
-      className={cn(
-        "flex items-center justify-center rounded-2xl text-2xl shadow-inner",
-        className,
+    <span className={cn("relative inline-flex items-center justify-center", className)}>
+      {backdrop && (
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-[28%]"
+          style={{
+            background: `radial-gradient(120% 120% at 30% 18%, oklch(0.9 0.1 ${hue}), oklch(0.66 0.18 ${hue}))`,
+            boxShadow: `inset 0 2px 6px oklch(1 0 0 / 0.4), 0 8px 18px -6px oklch(0.5 0.15 ${hue} / 0.5)`,
+          }}
+        />
       )}
-      style={{
-        background: `radial-gradient(120% 120% at 30% 20%, oklch(0.85 0.12 ${hue} / 0.9), oklch(0.6 0.18 ${hue} / 0.85))`,
-      }}
-    >
-      <span className="drop-shadow-sm">{emoji}</span>
-    </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        className="relative size-[76%] object-contain drop-shadow-[0_6px_9px_rgba(20,10,40,0.22)]"
+      />
+    </span>
   );
 }
