@@ -71,7 +71,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <Mascot emoji="🤖" hue={255} className="mx-auto size-20" />
+      <Mascot src="/3d/mascot-robot.png" className="mx-auto size-24" />
     </aside>
   );
 }

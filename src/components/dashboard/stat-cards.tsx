@@ -32,7 +32,7 @@ export function StatCards() {
           <br />
           できたよ〜！
         </p>
-        <Mascot emoji="🥳" hue={320} className="size-14 shrink-0" />
+        <Mascot src="/3d/mascot-party.png" className="size-16 shrink-0" />
       </div>
     </div>
   );
