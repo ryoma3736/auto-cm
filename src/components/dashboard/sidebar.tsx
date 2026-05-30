@@ -71,7 +71,9 @@ export function Sidebar() {
         </button>
       </div>
 
-      <Mascot src="/3d/mascot-robot.png" className="mx-auto size-24" />
+      <div className="mx-auto grid size-24 place-items-center rounded-3xl bg-white/95 shadow-lg">
+        <Mascot src="/3d/mascot-robot-wave.png" className="size-[88%]" />
+      </div>
     </aside>
   );
 }
