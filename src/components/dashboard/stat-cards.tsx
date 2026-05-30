@@ -32,7 +32,9 @@ export function StatCards() {
           <br />
           できたよ〜！
         </p>
-        <Mascot src="/3d/mascot-party.png" className="size-16 shrink-0" />
+        <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-white/95 shadow">
+          <Mascot src="/3d/mascot-party.png" className="size-[88%]" />
+        </div>
       </div>
     </div>
   );
