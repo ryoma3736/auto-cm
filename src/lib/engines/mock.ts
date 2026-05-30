@@ -1,7 +1,7 @@
 import type { EngineId, EngineStatus, EngineSubmission, GenerateParams, VideoEngine } from "./types";
 
-const SAMPLE_VIDEO =
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+// Bundled local sample (same-origin) — the previous gtv-videos-bucket URL is now HTTP 403.
+const SAMPLE_VIDEO = "/sample-cm.mp4";
 
 /**
  * Deterministic mock engine used when MOCK_ENGINES=1 or no provider is configured.
