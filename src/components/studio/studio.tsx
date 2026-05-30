@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowRight, Download, Loader2, RotateCcw, Wand2 } from "lucide-react";
+import { ArrowRight, Download, Loader2, RotateCcw, Wand2, Star, Clock, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { Dropzone } from "./dropzone";
 import { EngineCard } from "./engine-card";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { pushRecent, updateRecentStatus } from "@/lib/recent";
 
 type Step = "upload" | "review" | "result";
 
@@ -76,6 +77,7 @@ export function Studio({ liveEngines }: { liveEngines: EngineId[] }) {
   const [selected, setSelected] = useState<EngineId[]>([]);
 
   const [job, setJob] = useState<Job | null>(null);
+  const [best, setBest] = useState<EngineId | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const liveSet = new Set(liveEngines);
@@ -89,6 +91,7 @@ export function Studio({ liveEngines }: { liveEngines: EngineId[] }) {
     setScript(null);
     setSelected([]);
     setJob(null);
+    setBest(null);
   };
 
   const analyze = async () => {
@@ -136,6 +139,14 @@ export function Studio({ liveEngines }: { liveEngines: EngineId[] }) {
       const data = await res.json();
       setJob(data.job);
       setStep("result");
+      pushRecent({
+        id: data.job.id,
+        name: analysis?.productName || productHint || "無題のCM",
+        createdAt: Date.now(),
+        aspect,
+        engines: selected,
+        status: "processing",
+      });
     } catch (e) {
       toast.error(`生成エラー: ${String(e)}`);
     } finally {
@@ -162,6 +173,14 @@ export function Studio({ liveEngines }: { liveEngines: EngineId[] }) {
       if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, [step, job]);
+
+  // Reflect terminal job state into the "recent works" store.
+  useEffect(() => {
+    if (!job) return;
+    const runs = Object.values(job.runs);
+    if (runs.some((r) => r.status === "processing" || r.status === "pending")) return;
+    updateRecentStatus(job.id, runs.some((r) => r.status === "succeeded") ? "succeeded" : "failed");
+  }, [job]);
 
   const toggleEngine = useCallback((id: EngineId) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -296,9 +315,20 @@ export function Studio({ liveEngines }: { liveEngines: EngineId[] }) {
 
         {step === "result" && job && (
           <Section key="result">
+            {Object.values(job.runs).length > 1 && (
+              <p className="mb-4 text-center text-sm text-muted-foreground">
+                生成された動画を見比べて、ベストな1本を選びましょう。
+              </p>
+            )}
             <div className="grid gap-5 sm:grid-cols-2">
               {Object.values(job.runs).map((run) => (
-                <ResultCard key={run.engine} run={run} aspect={aspect} />
+                <ResultCard
+                  key={run.engine}
+                  run={run}
+                  aspect={aspect}
+                  isBest={best === run.engine}
+                  onPickBest={() => setBest((b) => (b === run.engine ? null : run.engine))}
+                />
               ))}
             </div>
             <div className="mt-6 flex justify-center">
@@ -313,15 +343,37 @@ export function Studio({ liveEngines }: { liveEngines: EngineId[] }) {
   );
 }
 
-function ResultCard({ run, aspect }: { run: EngineRun; aspect: AspectRatio }) {
+function ResultCard({
+  run,
+  aspect,
+  isBest,
+  onPickBest,
+}: {
+  run: EngineRun;
+  aspect: AspectRatio;
+  isBest: boolean;
+  onPickBest: () => void;
+}) {
   const info = ENGINE_CATALOG[run.engine];
   const pending = run.status === "processing" || run.status === "pending";
+  const done = run.status === "succeeded" && !!run.videoUrl;
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <span className="font-heading text-sm font-semibold">{info.name}</span>
+    <Card className={cn("overflow-hidden p-0 transition-shadow", isBest && "ring-2 ring-primary glow")}>
+      <div className="flex items-start justify-between gap-2 border-b border-border px-4 py-2.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate font-heading text-sm font-semibold">{info.name}</span>
+            {isBest && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+                <Trophy className="size-2.5" /> ベスト
+              </span>
+            )}
+          </div>
+          <p className="truncate text-[11px] text-muted-foreground">{info.provider}</p>
+        </div>
         <StatusBadge status={run.status} />
       </div>
+
       <div
         className={cn(
           "relative flex items-center justify-center bg-muted/30",
@@ -341,12 +393,37 @@ function ResultCard({ run, aspect }: { run: EngineRun; aspect: AspectRatio }) {
           <video src={run.videoUrl} controls playsInline className="size-full object-contain" />
         )}
       </div>
-      {run.status === "succeeded" && run.videoUrl && (
-        <div className="p-3">
+
+      {/* spec chip — provider / quality / time / cost for at-a-glance comparison */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-0.5" aria-label={`品質 ${info.quality} / 5`}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star
+              key={i}
+              className={cn("size-2.5", i < info.quality ? "fill-primary text-primary" : "text-muted-foreground/30")}
+            />
+          ))}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Clock className="size-3" /> {info.estimatedTime}
+        </span>
+        <span className="tabular-nums">{info.costPerGeneration}/本</span>
+      </div>
+
+      {done && (
+        <div className="flex gap-2 p-3 pt-2.5">
+          <button
+            type="button"
+            onClick={onPickBest}
+            aria-pressed={isBest}
+            className={cn(buttonVariants({ variant: isBest ? "default" : "outline", size: "sm" }))}
+          >
+            <Trophy className="size-4" /> {isBest ? "ベスト" : "ベストに"}
+          </button>
           <a
             href={run.videoUrl}
             download={`autocm-${run.engine}.mp4`}
-            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full")}
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "flex-1")}
           >
             <Download className="size-4" /> ダウンロード
           </a>

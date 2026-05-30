@@ -1,21 +1,16 @@
 import type { EngineId } from "@/lib/engines/types";
 
-/** Per-engine accent gradients matched to the reference design. */
+/**
+ * Per-engine accent gradients — intentional color-coding sourced from the
+ * Customer Cloud domain palette (sky / emerald / amber-coral / royal blue).
+ * No generic purple-pink "AI slop" gradients.
+ */
 export const ENGINE_ACCENT: Record<EngineId, string> = {
-  sora2: "from-blue-400 to-blue-600",
-  veo3: "from-teal-400 to-emerald-600",
-  kling: "from-orange-400 to-amber-600",
-  seedance: "from-violet-400 to-purple-600",
-  heygen: "from-pink-400 to-rose-600",
-};
-
-/** Softer thumbnail backgrounds per engine. */
-export const ENGINE_THUMB: Record<EngineId, string> = {
-  sora2: "from-amber-200 via-orange-200 to-rose-200",
-  veo3: "from-indigo-300 via-blue-300 to-sky-200",
-  kling: "from-orange-300 via-amber-200 to-yellow-200",
-  seedance: "from-fuchsia-300 via-purple-300 to-indigo-300",
-  heygen: "from-rose-200 via-pink-200 to-orange-200",
+  sora2: "from-sky-400 to-sky-600", // Sky Blue (AGI) — premium / photoreal
+  veo3: "from-emerald-400 to-emerald-600", // Emerald (Environment) — native audio
+  kling: "from-amber-400 to-orange-500", // Amber-Coral — motion / energy
+  seedance: "from-blue-500 to-indigo-700", // Royal Blue (Finance) — cinematic depth
+  heygen: "from-orange-400 to-rose-500", // warm coral-rose — talking head
 };
 
 /** Short label shown on pills/cards (e.g. "Sora2", "Veo3"). */

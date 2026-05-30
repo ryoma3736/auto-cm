@@ -6,9 +6,9 @@ import { Mascot } from "./mascot";
 import { EnginePills } from "./engine-pills";
 
 const STEPS = [
-  { n: 1, title: "商品を入力", sub: "URL・画像をアップロード", src: "/3d/mascot-robot.png", ring: "from-blue-400 to-blue-600" },
-  { n: 2, title: "AIが企画", sub: "台本・構成を自動生成", src: "/3d/mascot-ai.png", ring: "from-fuchsia-400 to-purple-600" },
-  { n: 3, title: "CMを生成", sub: "5エンジンで同時生成", src: "/3d/mascot-wizard.png", ring: "from-emerald-400 to-teal-600" },
+  { n: 1, title: "商品を入力", sub: "画像をアップロード", src: "/3d/mascot-robot.png", ring: "from-sky-400 to-sky-600" },
+  { n: 2, title: "AIが企画", sub: "台本・構成を自動生成", src: "/3d/mascot-ai.png", ring: "from-amber-400 to-orange-500" },
+  { n: 3, title: "CMを生成", sub: "5エンジンで同時生成・比較", src: "/3d/mascot-wizard.png", ring: "from-emerald-400 to-emerald-600" },
 ];
 
 export function Hero({ onStart }: { onStart: () => void }) {
@@ -57,10 +57,10 @@ export function Hero({ onStart }: { onStart: () => void }) {
             <span className="rounded-2xl bg-slate-900/90 px-5 py-2 font-heading text-lg font-extrabold text-white shadow-xl">
               完成！
             </span>
-            <div className="w-full rounded-3xl bg-gradient-to-br from-fuchsia-400/50 to-indigo-500/50 p-2 shadow-xl">
+            <div className="w-full rounded-3xl bg-gradient-to-br from-amber-300/60 to-orange-400/60 p-2 shadow-xl">
               <div className="flex flex-col items-center rounded-2xl bg-white px-2 pb-2 pt-1">
                 <Mascot src="/3d/mascot-director.png" className="size-24" />
-                <span className="-mt-1 text-[11px] font-bold tracking-[0.2em] text-violet-700">DIRECTOR</span>
+                <span className="-mt-1 text-[11px] font-bold tracking-[0.2em] text-primary">DIRECTOR</span>
               </div>
             </div>
           </div>

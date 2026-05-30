@@ -9,7 +9,6 @@ import {
   Palette,
   Settings,
   KeyRound,
-  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Mascot } from "./mascot";
@@ -54,25 +53,12 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* PRO plan credit widget */}
-      <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-amber-300">
-          <Crown className="size-3.5" /> PRO PLAN
+      {/* Friendly mascot anchored to the bottom */}
+      <div className="mt-auto flex flex-col items-center gap-2 pt-4">
+        <div className="grid size-24 place-items-center rounded-3xl bg-white/95 shadow-lg">
+          <Mascot src="/3d/mascot-robot-wave.png" className="size-[88%]" />
         </div>
-        <p className="text-xs text-sidebar-muted">生成クレジット</p>
-        <p className="font-heading text-2xl font-extrabold tabular-nums">
-          850 <span className="text-sm font-medium text-sidebar-muted">/ 1,000</span>
-        </p>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="bg-gradient-primary h-full w-[85%] rounded-full" />
-        </div>
-        <button className="bg-gradient-primary mt-3 w-full rounded-xl py-2 text-xs font-bold text-white">
-          プランをアップグレード
-        </button>
-      </div>
-
-      <div className="mx-auto grid size-24 place-items-center rounded-3xl bg-white/95 shadow-lg">
-        <Mascot src="/3d/mascot-robot-wave.png" className="size-[88%]" />
+        <p className="text-center text-xs text-sidebar-muted">画像1枚から、CMを。</p>
       </div>
     </aside>
   );

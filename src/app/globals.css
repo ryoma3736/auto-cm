@@ -26,10 +26,12 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  /* AutoCM brand palette (vibrant) */
-  --color-brand-blue: var(--brand-blue);
-  --color-brand-purple: var(--brand-purple);
-  --color-brand-pink: var(--brand-pink);
+  /* AutoCM brand palette — official Customer Cloud domain colors (intentional, multi-color) */
+  --color-brand-coral: var(--brand-coral);
+  --color-brand-amber: var(--brand-amber);
+  --color-brand-sky: var(--brand-sky);
+  --color-brand-emerald: var(--brand-emerald);
+  --color-brand-royal: var(--brand-royal);
   --color-cta: var(--cta);
   --color-cta-end: var(--cta-end);
   --color-sidebar: var(--sidebar);
@@ -46,59 +48,63 @@
 :root {
   --radius: 0.875rem;
 
-  --background: oklch(0.985 0.006 255);
-  --foreground: oklch(0.25 0.04 265);
+  /* Bright, warm canvas — friendly "wakuwaku" but not stark white */
+  --background: oklch(0.99 0.004 95);
+  --foreground: oklch(0.24 0.02 60);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.04 265);
+  --card-foreground: oklch(0.24 0.02 60);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.04 265);
+  --popover-foreground: oklch(0.24 0.02 60);
 
-  --primary: oklch(0.58 0.22 292);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.02 280);
-  --secondary-foreground: oklch(0.32 0.05 280);
-  --muted: oklch(0.96 0.01 270);
-  --muted-foreground: oklch(0.55 0.03 275);
-  --accent: oklch(0.95 0.04 300);
-  --accent-foreground: oklch(0.32 0.08 295);
+  /* Coral Orange (Urban #E8734A) — primary energy / action */
+  --primary: oklch(0.7 0.16 48);
+  --primary-foreground: oklch(0.99 0.01 80);
+  --secondary: oklch(0.97 0.02 70);
+  --secondary-foreground: oklch(0.34 0.05 50);
+  --muted: oklch(0.97 0.01 75);
+  --muted-foreground: oklch(0.52 0.02 60);
+  --accent: oklch(0.95 0.04 70);
+  --accent-foreground: oklch(0.34 0.07 45);
   --destructive: oklch(0.62 0.23 18);
 
-  --border: oklch(0.92 0.01 280);
-  --input: oklch(0.92 0.01 280);
-  --ring: oklch(0.58 0.22 292);
+  --border: oklch(0.91 0.01 70);
+  --input: oklch(0.91 0.01 70);
+  --ring: oklch(0.7 0.16 48);
 
-  /* Vibrant brand */
-  --brand-blue: oklch(0.62 0.2 258);
-  --brand-purple: oklch(0.58 0.24 296);
-  --brand-pink: oklch(0.66 0.23 0);
-  --cta: oklch(0.82 0.16 78);
-  --cta-end: oklch(0.72 0.2 47);
+  /* Brand domain palette — bright, fun, all sourced from official brand hues */
+  --brand-coral: oklch(0.7 0.16 48);    /* #E8734A Urban */
+  --brand-amber: oklch(0.82 0.15 78);   /* marigold / spotlight */
+  --brand-sky: oklch(0.66 0.13 230);    /* #0095C8 AGI */
+  --brand-emerald: oklch(0.6 0.11 170); /* #079173 Environment */
+  --brand-royal: oklch(0.46 0.13 265);  /* #2856A3 Finance */
+  --cta: oklch(0.84 0.15 80);           /* amber */
+  --cta-end: oklch(0.7 0.17 45);        /* coral */
 
-  /* Dark navy sidebar */
-  --sidebar: oklch(0.24 0.06 277);
-  --sidebar-foreground: oklch(0.96 0.01 270);
-  --sidebar-muted: oklch(0.7 0.04 277);
+  /* Warm charcoal sidebar (navy-purple retired) */
+  --sidebar: oklch(0.24 0.02 60);
+  --sidebar-foreground: oklch(0.97 0.01 75);
+  --sidebar-muted: oklch(0.72 0.02 65);
 }
 
 .dark {
-  --background: oklch(0.18 0.03 270);
-  --foreground: oklch(0.96 0.01 270);
-  --card: oklch(0.24 0.04 272);
-  --card-foreground: oklch(0.96 0.01 270);
-  --popover: oklch(0.24 0.04 272);
-  --popover-foreground: oklch(0.96 0.01 270);
-  --primary: oklch(0.7 0.2 295);
-  --primary-foreground: oklch(0.18 0.03 270);
-  --secondary: oklch(0.3 0.04 275);
-  --secondary-foreground: oklch(0.96 0.01 270);
-  --muted: oklch(0.3 0.03 275);
-  --muted-foreground: oklch(0.72 0.03 275);
-  --accent: oklch(0.34 0.06 295);
-  --accent-foreground: oklch(0.96 0.01 270);
+  --background: oklch(0.2 0.012 60);
+  --foreground: oklch(0.96 0.01 75);
+  --card: oklch(0.25 0.014 60);
+  --card-foreground: oklch(0.96 0.01 75);
+  --popover: oklch(0.25 0.014 60);
+  --popover-foreground: oklch(0.96 0.01 75);
+  --primary: oklch(0.74 0.15 52);
+  --primary-foreground: oklch(0.2 0.012 60);
+  --secondary: oklch(0.3 0.018 60);
+  --secondary-foreground: oklch(0.96 0.01 75);
+  --muted: oklch(0.3 0.016 60);
+  --muted-foreground: oklch(0.72 0.02 65);
+  --accent: oklch(0.34 0.04 55);
+  --accent-foreground: oklch(0.96 0.01 75);
   --destructive: oklch(0.7 0.19 20);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.7 0.2 295);
+  --ring: oklch(0.74 0.15 52);
 }
 
 @layer base {
@@ -113,15 +119,17 @@
   }
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
+    text-wrap: balance;
   }
 }
 
 @layer utilities {
+  /* Warm "sunrise / spotlight" gradient — replaces the generic blue→purple→pink slop */
   .bg-gradient-primary {
-    background-image: linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-purple) 55%, var(--brand-pink) 100%);
+    background-image: linear-gradient(120deg, var(--brand-amber) 0%, var(--brand-coral) 100%);
   }
   .text-gradient-primary {
-    background-image: linear-gradient(100deg, var(--brand-blue) 0%, var(--brand-purple) 50%, var(--brand-pink) 100%);
+    background-image: linear-gradient(100deg, var(--brand-coral) 0%, var(--brand-amber) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -131,19 +139,20 @@
   }
   .bg-gradient-hero {
     background-image:
-      radial-gradient(120% 80% at 80% 0%, oklch(0.9 0.08 250 / 70%) 0%, transparent 55%),
-      linear-gradient(180deg, oklch(0.72 0.13 245) 0%, oklch(0.82 0.1 240) 45%, oklch(0.93 0.05 250) 100%);
+      radial-gradient(120% 80% at 80% 0%, oklch(0.92 0.08 80 / 70%) 0%, transparent 55%),
+      linear-gradient(180deg, oklch(0.8 0.12 72) 0%, oklch(0.88 0.08 80) 45%, oklch(0.95 0.04 85) 100%);
   }
   .bg-sidebar-grad {
-    background-image: linear-gradient(190deg, oklch(0.26 0.07 280) 0%, oklch(0.2 0.06 285) 100%);
+    background-image: linear-gradient(190deg, oklch(0.26 0.02 60) 0%, oklch(0.2 0.018 55) 100%);
   }
+  /* Single, restrained warm glow — used only on the primary CTA */
   .glow {
-    box-shadow: 0 10px 30px -8px oklch(0.58 0.22 292 / 35%);
+    box-shadow: 0 10px 30px -10px oklch(0.7 0.16 48 / 28%);
   }
   .glow-cta {
-    box-shadow: 0 10px 26px -6px oklch(0.75 0.18 60 / 50%);
+    box-shadow: 0 10px 26px -6px oklch(0.75 0.17 55 / 45%);
   }
   .card-soft {
-    box-shadow: 0 1px 2px oklch(0.5 0.05 280 / 6%), 0 8px 24px -12px oklch(0.5 0.05 280 / 18%);
+    box-shadow: 0 1px 2px oklch(0.5 0.03 60 / 6%), 0 8px 24px -12px oklch(0.5 0.03 60 / 16%);
   }
 }
