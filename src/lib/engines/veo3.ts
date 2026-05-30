@@ -22,7 +22,8 @@ export const veo3Engine: VideoEngine = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         instances: [instance],
-        parameters: { aspectRatio: params.aspectRatio, generateAudio: true },
+        // Veo 3 generates native audio automatically; `generateAudio` is rejected (400).
+        parameters: { aspectRatio: params.aspectRatio },
       }),
     });
     if (!res.ok) throw new Error(`Veo3 submit failed: ${res.status} ${await res.text()}`);
