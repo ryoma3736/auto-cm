@@ -2,9 +2,8 @@ import { env } from "@/lib/env";
 import type { EngineStatus, EngineSubmission, GenerateParams, VideoEngine } from "./types";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const MODEL = "veo-3.0-fast-generate-001";
 
-/** Google Veo 3 via Gemini API long-running operations (poll-based, native audio). */
+/** Google Veo via Gemini API long-running operations (poll-based, native audio). Model id from env.VEO_MODEL. */
 export const veo3Engine: VideoEngine = {
   id: "veo3",
   isConfigured: () => Boolean(env.GEMINI_API_KEY),
@@ -17,7 +16,7 @@ export const veo3Engine: VideoEngine = {
         mimeType: "image/jpeg",
       };
     }
-    const res = await fetch(`${BASE_URL}/models/${MODEL}:predictLongRunning?key=${env.GEMINI_API_KEY}`, {
+    const res = await fetch(`${BASE_URL}/models/${env.VEO_MODEL}:predictLongRunning?key=${env.GEMINI_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

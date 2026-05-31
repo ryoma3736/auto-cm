@@ -8,6 +8,9 @@ export const env = {
   GEMINI_SCRIPT_MODEL: process.env.GEMINI_SCRIPT_MODEL ?? "gemini-2.0-flash",
 
   // Video engines
+  // Google Veo model id (Gemini API). Latest API-available model as of 2026-05.
+  // Swap to a newer model (e.g. Gemini Omni once its developer API ships) via this env var alone.
+  VEO_MODEL: process.env.VEO_MODEL ?? "veo-3.1-fast-generate-preview",
   REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN ?? "",
   ARK_API_KEY: process.env.ARK_API_KEY ?? "",
   ARK_ENDPOINT_ID: process.env.ARK_ENDPOINT_ID ?? "",
