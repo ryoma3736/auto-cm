@@ -3,7 +3,7 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 let KEY = process.env.GEMINI_API_KEY;
 if (!KEY && existsSync(".env.local")) KEY = readFileSync(".env.local", "utf8").match(/GEMINI_API_KEY=(.+)/)?.[1].trim();
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
-const MODEL = "veo-3.0-fast-generate-001";
+const MODEL = process.env.VEO_MODEL || "veo-3.1-fast-generate-preview";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const prompt =

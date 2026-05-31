@@ -42,6 +42,13 @@ const LANG_RULE: Record<Lang, string> = {
   zh: "严格要求：narration 和 hook 必须用自然口语化的中文书写。",
 };
 
+/** Human casting per market — the CM MUST feature a real, expressive person using the product. */
+const CAST_RULE: Record<Lang, string> = {
+  ja: "起用人物: 20〜30代の日本人女性モデル/女優（自然な美しさ、上品で親しみやすい）。商品を手に取り、実際に使い、表情豊かに魅せる実写であること。商品単体のショットだけで終わらせない。",
+  en: "Casting: a real, relatable female presenter (20s–30s) who holds and actually uses the product, expressive and natural. Never a product-only montage.",
+  zh: "出镜人物：20–30岁真实自然的女性模特/演员，手持并实际使用产品，表情自然生动。不要只有产品空镜。",
+};
+
 function stripBase64(b: string): string {
   return b.replace(/^data:[^;]+;base64,/, "");
 }
@@ -59,6 +66,7 @@ function parseJson<T>(raw: string): T {
 
 function buildPrompt(input: AnalyzeInput): string {
   const langRule = LANG_RULE[input.lang];
+  const castRule = CAST_RULE[input.lang];
   const custom = input.customPrompt?.trim()
     ? `\nユーザー指定の方向性（最優先で反映）: ${input.customPrompt.trim()}`
     : "";
@@ -68,9 +76,13 @@ function buildPrompt(input: AnalyzeInput): string {
 
 ${langRule}
 
+${castRule}
+
 重要:
 - videoPrompt は英語で、全シーンを統合した1本の動画生成プロンプトにすること。
-- videoPrompt には narration の内容（話す言葉の意図）と「speaking in ${input.lang}」を必ず含めること。
+- videoPrompt の主役は上記の起用人物にすること（実写の人物が商品を手に取り使うシーンを中心に、photorealistic / cinematic）。商品単体ショットだけにしない。
+- videoPrompt には narration の内容（話す言葉の意図）と「the presenter speaking in ${input.lang}」を必ず含めること（Veo3 の native audio で声が乗る）。
+- videoPrompt の末尾に必ず "no on-screen text, no captions, no subtitles, no watermark, clean frame" を含めること（テロップは後処理で焼くため、動画内に文字を一切描かせない）。
 - ${input.duration}秒に収まる尺・テンポにすること。
 
 次のJSONスキーマで厳密に返答（説明文・マークダウン不要、JSONのみ）:
@@ -86,7 +98,7 @@ ${langRule}
   "script": {
     "hook": "冒頭3秒のフック（${input.lang}）",
     "narration": "ナレーション全文（${input.lang}）",
-    "videoPrompt": "English scene-merged video generation prompt, embedding the narration intent, ending with 'speaking in ${input.lang}'."
+    "videoPrompt": "English scene-merged video generation prompt featuring a real human presenter holding and using the product (photorealistic, cinematic), embedding the narration intent, including 'the presenter speaking in ${input.lang}', and ending with 'no on-screen text, no captions, no subtitles, clean frame'."
   }
 }`;
 }
@@ -111,7 +123,7 @@ function fallback(input: AnalyzeInput): AnalyzeResult {
     script: {
       hook: input.lang === "ja" ? "これ、知ってる人だけ得してる。" : "The ones in the know are winning.",
       narration: narration[input.lang],
-      videoPrompt: `Cinematic ${input.duration}s commercial of ${name}, slow dolly-in, warm key light, premium mood, product hero shot, a friendly presenter speaking in ${input.lang}: "${narration[input.lang]}". ${input.customPrompt ?? ""}`.trim(),
+      videoPrompt: `Photorealistic cinematic ${input.duration}s commercial: a real ${input.lang === "ja" ? "Japanese " : ""}female model (20s-30s, natural beauty) holds and uses ${name}, expressive close-ups, soft warm key light, shallow depth of field, premium mood. The presenter speaking in ${input.lang}: "${narration[input.lang]}". No on-screen text, no captions, no subtitles, no watermark, clean frame. ${input.customPrompt ?? ""}`.trim(),
       durationSeconds: input.duration,
       lang: input.lang,
     },

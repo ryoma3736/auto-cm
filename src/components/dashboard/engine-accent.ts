@@ -16,7 +16,7 @@ export const ENGINE_ACCENT: Record<EngineId, string> = {
 /** Short label shown on pills/cards (e.g. "Sora2", "Veo3"). */
 export const ENGINE_SHORT: Record<EngineId, string> = {
   sora2: "Sora2",
-  veo3: "Veo3",
+  veo3: "Veo 3.1",
   kling: "Kling",
   seedance: "Seedance",
   heygen: "HeyGen",
